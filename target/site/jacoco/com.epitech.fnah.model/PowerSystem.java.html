@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PowerSystem.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">fnah</a> &gt; <a href="index.source.html" class="el_package">com.epitech.fnah.model</a> &gt; <span class="el_source">PowerSystem.java</span></div><h1>PowerSystem.java</h1><pre class="source lang-java linenums">package com.epitech.fnah.model;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.Consumer;
+
+public class PowerSystem {
+
+    public static final double MAX_ENERGY = 100.0;
+    public static final double DRAIN_PER_USAGE_PER_SECOND = 0.1;
+    public static final int BASE_USAGE = 1;
+
+    private double energy;
+    private double energyMultiplier;
+    private boolean powerOut;
+
+<span class="fc" id="L17">    private final List&lt;PowerConsumer&gt; consumers = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L18">    private final List&lt;Consumer&lt;PowerSystem&gt;&gt; powerOutListeners = new ArrayList&lt;&gt;();</span>
+
+    public PowerSystem() {
+<span class="fc" id="L21">        this(1.0);</span>
+<span class="fc" id="L22">    }</span>
+
+<span class="fc" id="L24">    public PowerSystem(double energyMultiplier) {</span>
+<span class="fc" id="L25">        this.energy = MAX_ENERGY;</span>
+<span class="fc" id="L26">        this.energyMultiplier = energyMultiplier;</span>
+<span class="fc" id="L27">        this.powerOut = false;</span>
+<span class="fc" id="L28">    }</span>
+
+    public void addConsumer(PowerConsumer c) {
+<span class="nc" id="L31">        consumers.add(c);</span>
+<span class="nc" id="L32">    }</span>
+
+    public int computeUsage() {
+<span class="fc" id="L35">        int usage = BASE_USAGE;</span>
+<span class="pc bpc" id="L36" title="1 of 2 branches missed.">        for (PowerConsumer c : consumers) {</span>
+<span class="nc" id="L37">            usage += c.getPowerUsage();</span>
+<span class="nc" id="L38">        }</span>
+<span class="fc" id="L39">        return usage;</span>
+    }
+
+    public void update(double deltaSeconds) {
+<span class="pc bpc" id="L43" title="1 of 2 branches missed.">        if (deltaSeconds &lt; 0) {</span>
+<span class="nc" id="L44">            throw new IllegalArgumentException(&quot;deltaSeconds must be &gt;= 0&quot;);</span>
+        }
+<span class="pc bpc" id="L46" title="1 of 2 branches missed.">        if (powerOut) {</span>
+<span class="nc" id="L47">            return;</span>
+        }
+<span class="fc" id="L49">        double drain = computeUsage()</span>
+                * DRAIN_PER_USAGE_PER_SECOND
+                * energyMultiplier
+                * deltaSeconds;
+<span class="fc" id="L53">        energy = Math.max(0.0, energy - drain);</span>
+<span class="pc bpc" id="L54" title="1 of 4 branches missed.">        if (energy == 0.0 &amp;&amp; !powerOut) {</span>
+<span class="fc" id="L55">            powerOut = true;</span>
+<span class="fc" id="L56">            notifyPowerOut();</span>
+        }
+<span class="fc" id="L58">    }</span>
+
+<span class="fc" id="L60">    public double getEnergy() { return energy; }</span>
+
+<span class="nc" id="L62">    public boolean isPowerOut() { return powerOut; }</span>
+
+<span class="nc" id="L64">    public void setEnergyMultiplier(double m) { this.energyMultiplier = m; }</span>
+
+    public void onPowerOut(Consumer&lt;PowerSystem&gt; listener) {
+<span class="fc" id="L67">        powerOutListeners.add(listener);</span>
+<span class="fc" id="L68">    }</span>
+
+    public void reset() {
+<span class="fc" id="L71">        energy = MAX_ENERGY;</span>
+<span class="fc" id="L72">        powerOut = false;</span>
+<span class="fc" id="L73">    }</span>
+
+    private void notifyPowerOut() {
+<span class="fc bfc" id="L76" title="All 2 branches covered.">        for (Consumer&lt;PowerSystem&gt; l : powerOutListeners) {</span>
+<span class="fc" id="L77">            l.accept(this);</span>
+<span class="fc" id="L78">        }</span>
+<span class="fc" id="L79">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>
