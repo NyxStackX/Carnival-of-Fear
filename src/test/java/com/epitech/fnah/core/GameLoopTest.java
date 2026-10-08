@@ -105,4 +105,71 @@ class GameLoopTest {
         assertSame(clock, loop.getContext().clock);
         assertSame(power, loop.getContext().power);
     }
+
+    @Test
+    void attackStartsJumpscareThenGameOver() {
+        loop.registerSystem((dt, ctx) -> ctx.attackPlayer("Bobo"));
+        loop.startNight();
+        loop.tick(0.1);
+        assertEquals(GameState.JUMPSCARE, loop.getState());
+        assertEquals("Bobo", loop.getAttackerName());
+        loop.tick(GameLoop.JUMPSCARE_DURATION - 0.1);
+        assertEquals(GameState.JUMPSCARE, loop.getState());
+        loop.tick(0.1);
+        assertEquals(GameState.GAME_OVER, loop.getState());
+    }
+
+    @Test
+    void jumpscareFreezesTheClock() {
+        loop.registerSystem((dt, ctx) -> ctx.attackPlayer("Bobo"));
+        loop.startNight();
+        loop.tick(1.0);
+        double elapsed = clock.getElapsedSeconds();
+        loop.tick(1.0);
+        assertEquals(elapsed, clock.getElapsedSeconds());
+    }
+
+    @Test
+    void attackIgnoredOutsideNight() {
+        loop.triggerJumpscare("Bobo");
+        assertEquals(GameState.MENU, loop.getState());
+        assertNull(loop.getAttackerName());
+    }
+
+    @Test
+    void sixAmWinsBeforeALateAttack() {
+        loop.registerSystem((dt, ctx) -> {
+            if (ctx.clock.isNightOver()) ctx.attackPlayer("Bobo");
+        });
+        loop.startNight();
+        loop.tick(360.0);
+        assertEquals(GameState.WIN, loop.getState());
+    }
+
+    @Test
+    void startNightResetsSystemsAndOffice() {
+        AtomicInteger resets = new AtomicInteger();
+        loop.registerSystem(new Updatable() {
+            @Override
+            public void update(double dt, GameContext ctx) {
+            }
+
+            @Override
+            public void reset() {
+                resets.incrementAndGet();
+            }
+        });
+        loop.getContext().office.getLeftDoor().toggle();
+        loop.startNight();
+        assertEquals(1, resets.get());
+        assertFalse(loop.getContext().office.getLeftDoor().isClosed());
+    }
+
+    @Test
+    void closedDoorDrainsMorePower() {
+        loop.startNight();
+        loop.getContext().office.getLeftDoor().toggle();
+        loop.tick(1.0);
+        assertEquals(99.8, power.getEnergy(), 1e-9);
+    }
 }
