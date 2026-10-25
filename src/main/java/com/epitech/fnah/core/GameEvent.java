@@ -43,4 +43,21 @@ public sealed interface GameEvent {
      */
     record HourChanged(int hour) implements GameEvent {
     }
+
+    /**
+     * La tablette des caméras a été levée ou baissée.
+     *
+     * @param open   {@code true} si elle vient d'être levée
+     * @param camera salle affichée par la tablette
+     */
+    record TabletToggled(boolean open, Room camera) implements GameEvent {
+    }
+
+    /**
+     * Le joueur a choisi une autre caméra.
+     *
+     * @param camera salle désormais affichée
+     */
+    record CameraSelected(Room camera) implements GameEvent {
+    }
 }
