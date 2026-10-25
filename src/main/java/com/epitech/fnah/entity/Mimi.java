@@ -55,6 +55,11 @@ public final class Mimi extends Animatronic {
     }
 
     @Override
+    protected int hearingBonus(GameContext ctx) {
+        return ctx.office.getNoise().hearingBonus();
+    }
+
+    @Override
     protected boolean isObserved(GameContext ctx) {
         return ctx.office.getCameras().isWatching(getRoom());
     }

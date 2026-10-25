@@ -110,4 +110,53 @@ class PepinTest {
         assertFalse(pepin.isOut());
         assertEquals(Pepin.START_ROOM, pepin.getRoom());
     }
+
+    @Test
+    void hidingSilentlyMakesHimGiveUp() {
+        Pepin pepin = new Pepin(20, dice);
+        office.getOrgan().drain(BarrelOrgan.MAX_CHARGE);
+        pepin.update(0.1, context);
+        office.setHidden(true);
+        pepin.update(Pepin.ESCAPE_DELAY, context);
+        assertTrue(pepin.isSearching());
+        assertTrue(attacks.isEmpty());
+        pepin.update(Pepin.SEARCH_TIME, context);
+        assertFalse(pepin.isOut());
+        assertFalse(pepin.isSearching());
+        assertTrue(office.getOrgan().getCharge() >= Pepin.RETURN_THRESHOLD - 1e-9);
+        assertTrue(attacks.isEmpty());
+    }
+
+    @Test
+    void leavingTheHidingPlaceDuringTheSearchIsFatal() {
+        Pepin pepin = new Pepin(20, dice);
+        office.getOrgan().drain(BarrelOrgan.MAX_CHARGE);
+        pepin.update(0.1, context);
+        office.setHidden(true);
+        pepin.update(Pepin.ESCAPE_DELAY, context);
+        office.setHidden(false);
+        pepin.update(0.1, context);
+        assertEquals(List.of(Pepin.NAME), attacks);
+    }
+
+    @Test
+    void noiseDuringTheSearchGivesYouAway() {
+        Pepin pepin = new Pepin(20, dice);
+        office.getOrgan().drain(BarrelOrgan.MAX_CHARGE);
+        pepin.update(0.1, context);
+        office.setHidden(true);
+        pepin.update(Pepin.ESCAPE_DELAY, context);
+        office.getNoise().make(100);
+        pepin.update(0.1, context);
+        assertEquals(List.of(Pepin.NAME), attacks);
+    }
+
+    @Test
+    void windingIsNoisy() {
+        Pepin pepin = new Pepin(5, dice);
+        watchOrgan();
+        office.getOrgan().setWinding(true);
+        pepin.update(1.0, context);
+        assertEquals(Pepin.CRANK_NOISE_PER_SECOND, office.getNoise().getLevel(), 1e-9);
+    }
 }

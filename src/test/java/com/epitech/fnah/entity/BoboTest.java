@@ -128,7 +128,7 @@ class BoboTest {
         Bobo bobo = new Bobo(3, () -> 4);
         bobo.update(STEP, ctx);
         assertEquals(Room.PISTE_CENTRALE, bobo.getRoom());
-        clock.update(120.0); // 02:00, niveau 4
+        clock.update(GameClock.SECONDS_PER_HOUR * 2.0); // 02:00, niveau 4
         bobo.update(STEP, ctx);
         assertEquals(Room.GRADINS, bobo.getRoom());
     }
@@ -198,5 +198,76 @@ class BoboTest {
             protected void act(GameContext c) {
             }
         });
+    }
+
+    /** Dé qui réussit tout jusqu'à ce que Bobo soit à la porte, puis échoue toujours. */
+    private static Dice untilAtDoor(Bobo[] holder) {
+        return () -> holder[0] != null && holder[0].isAtDoor() ? 20 : 1;
+    }
+
+    @Test
+    void clownInFrontOfAnOpenDoorAlwaysKills() {
+        Bobo[] holder = new Bobo[1];
+        Bobo bobo = new Bobo(3, untilAtDoor(holder));
+        holder[0] = bobo;
+        bobo.update(STEP * 3, ctx);
+        assertTrue(bobo.isAtDoor());
+        bobo.update(Bobo.lurkTime(3) - 0.1, ctx);
+        assertTrue(attacks.isEmpty());
+        bobo.update(0.1, ctx);
+        assertEquals(List.of("Bobo"), attacks);
+        assertEquals(Room.REGIE, bobo.getRoom());
+    }
+
+    @Test
+    void closedDoorAlwaysSendsHimBackAfterWaiting() {
+        Bobo[] holder = new Bobo[1];
+        Bobo bobo = new Bobo(3, untilAtDoor(holder));
+        holder[0] = bobo;
+        bobo.update(STEP * 3, ctx);
+        office.getLeftDoor().toggle();
+        bobo.update(Bobo.lurkTime(3), ctx);
+        assertEquals(Bobo.RETREAT_ROOM, bobo.getRoom());
+        assertTrue(bobo.isSearching());
+        assertTrue(attacks.isEmpty());
+    }
+
+    @Test
+    void lurkTimeShrinksWithLevel() {
+        assertEquals(5.0, Bobo.lurkTime(0), 1e-9);
+        assertTrue(Bobo.lurkTime(10) < Bobo.lurkTime(3));
+        assertEquals(2.0, Bobo.lurkTime(20), 1e-9);
+    }
+
+    @Test
+    void searchesBeforeHuntingAgain() {
+        Bobo bobo = new Bobo(3, ALWAYS_ACT);
+        bobo.update(STEP * 3, ctx);
+        office.getLeftDoor().toggle();
+        bobo.update(STEP, ctx);
+        assertTrue(bobo.isSearching());
+        bobo.update(STEP * Bobo.SEARCH_MOVES, ctx);
+        assertFalse(bobo.isSearching());
+        bobo.reset();
+        assertFalse(bobo.isSearching());
+    }
+
+    @Test
+    void sometimesWandersInsteadOfHunting() {
+        Bobo bobo = new Bobo(3, () -> 15);
+        bobo.setBaseAiLevel(20);
+        bobo.update(STEP, ctx);
+        assertNotEquals(Room.PISTE_CENTRALE, bobo.getRoom());
+        assertNotEquals(Room.REGIE, bobo.getRoom());
+    }
+
+    @Test
+    void noiseMakesHimBolder() {
+        Bobo bobo = new Bobo(3, () -> 5);
+        bobo.update(STEP, ctx);
+        assertEquals(Room.PISTE_CENTRALE, bobo.getRoom());
+        office.getNoise().make(100);
+        bobo.update(STEP, ctx);
+        assertEquals(Room.GRADINS, bobo.getRoom());
     }
 }

@@ -76,7 +76,7 @@ public abstract class Animatronic implements Updatable {
         timer += deltaSeconds;
         while (timer >= actionInterval) {
             timer -= actionInterval;
-            if (!isObserved(ctx) && rollAction(ctx.clock.getHour())) {
+            if (!isObserved(ctx) && rollAction(ctx)) {
                 act(ctx);
             }
         }
@@ -207,9 +207,19 @@ public abstract class Animatronic implements Updatable {
         return level;
     }
 
-    private boolean rollAction(int hour) {
-        int level = getAiLevel(hour);
-        return level > 0 && dice.rollD20() <= level;
+    private boolean rollAction(GameContext ctx) {
+        int level = getAiLevel(ctx.clock.getHour());
+        return level > 0 && dice.rollD20() <= Math.min(MAX_AI_LEVEL, level + hearingBonus(ctx));
+    }
+
+    /**
+     * Bonus de niveau d'IA quand le clown entend le joueur. Aucun par défaut.
+     *
+     * @param ctx état de la nuit
+     * @return bonus ajouté au niveau d'IA pour le jet de dé
+     */
+    protected int hearingBonus(GameContext ctx) {
+        return 0;
     }
 
     /**

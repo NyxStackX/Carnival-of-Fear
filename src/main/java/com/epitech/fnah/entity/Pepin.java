@@ -13,7 +13,10 @@ import com.epitech.fnah.model.Room;
  * joueur le remonte en tenant la manivelle depuis la caméra 8. Si l'orgue
  * s'arrête, Pépin sort par la trappe : les portes ne servent à rien contre lui.
  * Le joueur a {@value #ESCAPE_DELAY} secondes pour remonter l'orgue jusqu'à
- * {@value #RETURN_THRESHOLD} % et le renvoyer dans sa boîte.</p>
+ * {@value #RETURN_THRESHOLD} % et le renvoyer dans sa boîte, ou pour se cacher
+ * sous le bureau : Pépin fouille alors la régie pendant {@value #SEARCH_TIME}
+ * secondes et repart s'il ne trouve personne. Sortir de sa cachette ou faire
+ * du bruit pendant la fouille est fatal.</p>
  */
 public final class Pepin extends Animatronic {
 
@@ -29,11 +32,17 @@ public final class Pepin extends Animatronic {
     public static final double ESCAPE_DELAY = 5.0;
     /** Charge à atteindre pour renvoyer Pépin dans sa boîte. */
     public static final double RETURN_THRESHOLD = 30.0;
+    /** Secondes que Pépin passe à fouiller la régie quand le joueur est caché. */
+    public static final double SEARCH_TIME = 5.0;
+    /** Bruit fait par seconde de manivelle. */
+    public static final double CRANK_NOISE_PER_SECOND = 8.0;
     /** Salle de sa boîte. */
     public static final Room START_ROOM = Room.FOSSE_ORCHESTRE;
 
     private boolean out;
+    private boolean searching;
     private double escapeTimer;
+    private double searchTimer;
 
     /**
      * Crée Pépin dans sa boîte.
@@ -50,6 +59,7 @@ public final class Pepin extends Animatronic {
         BarrelOrgan organ = ctx.office.getOrgan();
         if (organ.isWinding() && ctx.office.getCameras().isWatching(START_ROOM)) {
             organ.wind(deltaSeconds);
+            ctx.office.getNoise().make(CRANK_NOISE_PER_SECOND * deltaSeconds);
         } else {
             organ.drain(DRAIN_PER_LEVEL * getAiLevel(ctx.clock.getHour()) * deltaSeconds);
         }
@@ -67,13 +77,38 @@ public final class Pepin extends Animatronic {
             ctx.publish(new GameEvent.PepinEscaped(false));
             return true;
         }
+        if (searching) {
+            // Pépin fouille la régie : il trouve le joueur s'il sort de sa cachette ou fait du bruit
+            if (!ctx.office.isHidden() || ctx.office.getNoise().isLoud()) {
+                attack(ctx);
+                return true;
+            }
+            searchTimer -= deltaSeconds;
+            if (searchTimer <= 0) {
+                out = false;
+                searching = false;
+                organ.wind(RETURN_THRESHOLD / BarrelOrgan.WIND_RATE);
+                ctx.publish(new GameEvent.PepinEscaped(false));
+            }
+            return true;
+        }
         escapeTimer -= deltaSeconds;
         if (escapeTimer <= 0) {
-            out = false;
-            moveTo(Room.REGIE);
-            ctx.attackPlayer(getName());
+            if (ctx.office.isHidden()) {
+                searching = true;
+                searchTimer = SEARCH_TIME;
+            } else {
+                attack(ctx);
+            }
         }
         return true;
+    }
+
+    private void attack(GameContext ctx) {
+        out = false;
+        searching = false;
+        moveTo(Room.REGIE);
+        ctx.attackPlayer(getName());
     }
 
     /**
@@ -90,6 +125,8 @@ public final class Pepin extends Animatronic {
     @Override
     protected void resetSpecificBehavior() {
         out = false;
+        searching = false;
+        searchTimer = 0;
         escapeTimer = 0;
     }
 
@@ -109,5 +146,14 @@ public final class Pepin extends Animatronic {
      */
     public double getEscapeTimeRemaining() {
         return out ? Math.max(0, escapeTimer) : 0;
+    }
+
+    /**
+     * Indique si Pépin fouille la régie à la recherche du joueur caché.
+     *
+     * @return {@code true} pendant la fouille
+     */
+    public boolean isSearching() {
+        return searching;
     }
 }
