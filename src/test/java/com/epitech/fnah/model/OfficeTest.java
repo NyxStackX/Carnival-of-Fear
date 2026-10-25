@@ -100,4 +100,29 @@ class OfficeTest {
         assertEquals(BarrelOrgan.MAX_CHARGE, office.getOrgan().getCharge());
         assertFalse(office.getRightLight().isOn());
     }
+
+    @Test
+    void holdingTheFuseLeverMakesNoise() {
+        Office office = new Office();
+        office.getFuseBox().trip(FuseBox.Circuit.LIGHTS);
+        office.getFuseBox().setResetting(true);
+        office.update(1.0);
+        assertTrue(office.getNoise().getLevel() > 0);
+        office.update(FuseBox.RESET_TIME);
+        assertNull(office.getFuseBox().getTripped());
+    }
+
+    @Test
+    void resetClearsNoiseFusesAndHiding() {
+        Office office = new Office();
+        office.getNoise().make(80);
+        office.getFuseBox().trip(FuseBox.Circuit.CAMERAS);
+        office.setHidden(true);
+        assertTrue(office.isHidden());
+        office.reset();
+        assertEquals(0.0, office.getNoise().getLevel());
+        assertNull(office.getFuseBox().getTripped());
+        assertFalse(office.isHidden());
+        assertNotNull(office.getSafe());
+    }
 }

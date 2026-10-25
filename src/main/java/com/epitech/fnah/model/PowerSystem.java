@@ -17,7 +17,7 @@ public class PowerSystem {
     /** Énergie au début de chaque nuit, en pourcentage. */
     public static final double MAX_ENERGY = 100.0;
     /** Perte d'énergie par seconde et par point d'usage, en pourcentage. */
-    public static final double DRAIN_PER_USAGE_PER_SECOND = 0.1;
+    public static final double DRAIN_PER_USAGE_PER_SECOND = 0.15;
     /** Usage permanent de la régie, même sans aucun équipement actif. */
     public static final int BASE_USAGE = 1;
 
@@ -96,6 +96,22 @@ public class PowerSystem {
      * @return énergie restante, entre 0 et {@value #MAX_ENERGY}
      */
     public double getEnergy() { return energy; }
+
+    /**
+     * Recharge la réserve (batterie de secours), sans dépasser {@value #MAX_ENERGY}.
+     * Sans effet après une coupure : le disjoncteur général est grillé.
+     *
+     * @param amount énergie ajoutée, en pourcentage
+     * @throws IllegalArgumentException si la quantité est négative
+     */
+    public void recharge(double amount) {
+        if (amount < 0) {
+            throw new IllegalArgumentException("amount must be >= 0");
+        }
+        if (!powerOut) {
+            energy = Math.min(MAX_ENERGY, energy + amount);
+        }
+    }
 
     /**
      * Renvoie {@code true} si l'énergie est tombée à 0.
