@@ -43,7 +43,7 @@ final class EndingScreen implements Screen {
         "Créés par synthèse (tools/generate_sounds.py)",
         "",
         "POLICES",
-        "Rye (Sorkin Type) - Special Elite (Astigmatic)",
+        "Eater - IM Fell English - Rock Salt - Special Elite",
         "",
         "",
         "En souvenir de Marcel, veilleur de nuit.",
@@ -56,6 +56,7 @@ final class EndingScreen implements Screen {
     private double time;
     private boolean credits;
     private double creditsTime;
+    private boolean creditsDone;
 
     EndingScreen(Game game, Assets assets) {
         this.game = game;
@@ -104,8 +105,7 @@ final class EndingScreen implements Screen {
         gc.drawImage(newspaper, -450, -320);
         gc.restore();
         if (time > NEWSPAPER_MIN) {
-            Draw.text(gc, "[Entrée] Continuer", Draw.W - 40, Draw.H - 24, assets.ui(14), Draw.TEXT_DIM,
-                    TextAlignment.RIGHT);
+            Ui.hints(gc, Draw.W - 40, Draw.H - 26, TextAlignment.RIGHT, assets.ui(13), "Entrée", "Continuer");
         }
     }
 
@@ -205,16 +205,13 @@ final class EndingScreen implements Screen {
         double endY = y + 140;
         Draw.shadowText(gc, "FIN", cx, Math.max(Draw.H / 2, endY), assets.title(110), Draw.RED, TextAlignment.CENTER);
         if (endY <= Draw.H / 2) {
-            Draw.text(gc, "[Entrée] Retour au menu", cx, Draw.H / 2 + 110, assets.ui(16), Draw.TEXT_DIM,
-                    TextAlignment.CENTER);
+            Ui.hints(gc, cx, Draw.H / 2 + 110, TextAlignment.CENTER, assets.ui(14), "Entrée", "Retour au menu");
         } else {
-            Draw.text(gc, "[Entrée] Accélérer   [Échap] Menu", Draw.W - 40, Draw.H - 24, assets.ui(14),
-                    Draw.TEXT_DIM, TextAlignment.RIGHT);
+            Ui.hints(gc, Draw.W - 40, Draw.H - 26, TextAlignment.RIGHT, assets.ui(13), "Entrée", "Accélérer",
+                    "Échap", "Menu");
         }
         creditsDone = endY <= Draw.H / 2;
     }
-
-    private boolean creditsDone;
 
     private void startCredits() {
         credits = true;

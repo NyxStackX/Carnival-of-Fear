@@ -3,11 +3,16 @@ package com.epitech.fnah.view;
 import com.epitech.fnah.core.Game;
 import com.epitech.fnah.core.GameEvent;
 import com.epitech.fnah.core.GameState;
+import com.epitech.fnah.core.TerrorDirector;
 import com.epitech.fnah.entity.Mimi;
 import com.epitech.fnah.entity.Pepin;
 import com.epitech.fnah.entity.ZigEtZag;
 import com.epitech.fnah.model.BarrelOrgan;
 import com.epitech.fnah.model.CameraSystem;
+import com.epitech.fnah.model.Door;
+import com.epitech.fnah.model.FuseBox;
+import com.epitech.fnah.model.NoiseMeter;
+import com.epitech.fnah.model.Safe;
 import com.epitech.fnah.model.Room;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.image.Image;
@@ -49,17 +54,27 @@ final class NightScreen implements Screen {
     private static final double BTN_X = 372, BTN_Y = 300, BTN_W = 96, BTN_H = 140;
     private static final double RIGHT_BTN_X = 812, RIGHT_BTN_Y = 300, RIGHT_BTN_W = 96, RIGHT_BTN_H = 140;
     private static final double LIGHT_Y = 222, LIGHT_H = 66;
-    // Barre « Caméras » et pause
-    private static final double BAR_X = 440, BAR_Y = 682, BAR_W = 400, BAR_H = 30;
-    private static final double PAUSE_X = 860, PAUSE_Y = 682, PAUSE_W = 160, PAUSE_H = 30;
-    private static final double PAUSE_PANEL_X = 390, PAUSE_PANEL_Y = 210, PAUSE_PANEL_W = 500, PAUSE_PANEL_H = 300;
-    private static final double RESUME_X = 490, RESUME_Y = 365, PAUSE_ACTION_W = 300, PAUSE_ACTION_H = 52;
-    private static final double MENU_Y = 435;
-    // Plan des caméras
-    private static final double MAP_X = 950, MAP_Y = 410, MAP_W = 300, MAP_H = 270;
+    // Onglet « Caméras » et pause
+    private static final double BAR_X = 440, BAR_Y = 674, BAR_W = 400, BAR_H = 46;
+    private static final double PAUSE_X = 1100, PAUSE_Y = 672, PAUSE_W = 156, PAUSE_H = 36;
+    private static final double PAUSE_PANEL_X = 390, PAUSE_PANEL_Y = 190, PAUSE_PANEL_W = 500, PAUSE_PANEL_H = 330;
+    private static final double RESUME_X = 490, RESUME_Y = 320, PAUSE_ACTION_W = 300, PAUSE_ACTION_H = 52;
+    private static final double MENU_Y = 390;
+    // Plan des caméras (sous un bandeau de titre)
+    private static final double MAP_X = 950, MAP_Y = 360, MAP_W = 300, MAP_H = 292, MAP_HEAD = 26;
     private static final double CAM_W = 64, CAM_H = 28;
     // Manivelle de l'orgue (caméra 8)
     private static final double ORGAN_X = 40, ORGAN_Y = 430, ORGAN_W = 340, ORGAN_H = 140;
+    // Disjoncteur (au-dessus de la plaque gauche), coffre (au sol, à droite du bureau), carnet
+    private static final double FUSE_X = 382, FUSE_Y = 90, FUSE_W = 90, FUSE_H = 106;
+    private static final double SAFE_X = 868, SAFE_Y = 612, SAFE_W = 92, SAFE_H = 70;
+    private static final double NOTE_X = 352, NOTE_Y = 618, NOTE_W = 100, NOTE_H = 70;
+    private static final double CUT_X = 783, CUT_Y = 100, CUT_W = 126, CUT_H = 100;
+    // Bouton « se cacher », au-dessus de la pause
+    private static final double HIDE_X = 1100, HIDE_Y = 626, HIDE_W = 156, HIDE_H = 36;
+    // Décalage qui centre le plan des caméras dans son cadre
+    private static final double MAP_DX = 32, MAP_DY = 6;
+    private static final double FADE_IN = 1.8;
     // Nez de Bobo sur l'affiche (coordonnées écran) : easter egg
     private static final double NOSE_X = 640, NOSE_Y = 246, NOSE_R = 15;
     // Coupure de journal punaisée au mur, entre l'affiche et la porte droite
@@ -115,7 +130,15 @@ final class NightScreen implements Screen {
     private static final double TITLE_DURATION = 3.2;
     private static final double TYPE_SPEED = 30;
     private static final double CASSETTE_LINGER = 3.0;
-    private static final int CASSETTE_LINE = 62;
+    private static final int CASSETTE_LINE = 58;
+    /** Ce que la bande murmure quand elle se dérègle, une phrase par nuit. */
+    private static final String[] TAPE_WHISPERS = {
+        "NE TE RETOURNE PAS", "ELLE EST DÉJÀ DANS LE COULOIR", "TU ENTENDS L'ORGUE ?",
+        "IL CHANTE POUR TOI", "RESTE AVEC NOUS",
+    };
+    /** Proportion de la cassette à laquelle la bande se dérègle. */
+    private static final double GLITCH_AT = 0.55;
+    private static final double GLITCH_DURATION = 2.2;
     private static final double SWITCH_STATIC = 0.3;
     private static final double MOVE_STATIC = 1.0;
     private static final double SUBTITLE_DURATION = 3.0;
@@ -139,6 +162,7 @@ final class NightScreen implements Screen {
     private Image leftLit;
     private Image rightDark;
     private Image rightLit;
+    private Image mapBase;
 
     private double time;
     private double titleCard;
@@ -146,6 +170,10 @@ final class NightScreen implements Screen {
     private double cassetteTime;
     private int typedChars;
     private List<String> cassetteLines = List.of();
+    private double glitchTimer;
+    private boolean glitchDone;
+    private double reelAngle;
+    private Image cassetteBackground;
     private double staticTimer;
     private double subtitleTimer;
     private String subtitle;
@@ -170,11 +198,28 @@ final class NightScreen implements Screen {
     private double goldenStare;
     private double crashTimer;
     private double noseTimer;
+    // Fenêtres du bureau (coffre, carnet, coupure de journal)
+    private final DeskOverlays overlays;
+    // Arrivée dans la régie, après la cassette
+    private double fadeIn;
+    private boolean arrived;
+    // Événements du metteur en scène de la peur
+    private boolean cupFallen;
+    private double lampOff;
+    private Door.Side shadowSide;
+    private double shadowTimer;
+    private Room faceRoom;
+    private double faceTimer;
+    private Image officeShadow;
+    // Souris, pour le survol des boutons
+    private double mouseX = -1;
+    private double mouseY = -1;
 
     NightScreen(Game game, Assets assets, SoundManager sound) {
         this.game = game;
         this.assets = assets;
         this.sound = sound;
+        this.overlays = new DeskOverlays(game, assets);
         var events = game.getEvents();
         events.subscribe(GameEvent.CameraSelected.class, e -> onCameraShown(e.camera()));
         events.subscribe(GameEvent.TabletToggled.class, e -> {
@@ -184,6 +229,15 @@ final class NightScreen implements Screen {
         });
         events.subscribe(GameEvent.AnimatronicMoved.class, this::onAnimatronicMoved);
         events.subscribe(GameEvent.PowerOut.class, e -> showSubtitle("* Un claquement. Puis plus rien. *"));
+        events.subscribe(GameEvent.ScareEvent.class, e -> onScare(e.scare(), e.pan()));
+        events.subscribe(GameEvent.FuseChanged.class, e -> showSubtitle(e.tripped() == null
+                ? "* Le courant revient dans le circuit *"
+                : e.tripped() == FuseBox.Circuit.CAMERAS ? "* Un fusible saute : les caméras sont mortes *"
+                : "* Un fusible saute : les lampes des couloirs sont mortes *"));
+        events.subscribe(GameEvent.ClueFound.class, e -> showSubtitle("* Un chiffre griffonné sur le mur : "
+                + new String[]{"I", "II", "III"}[e.index()] + " = " + e.digit() + " (noté dans le carnet) *"));
+        events.subscribe(GameEvent.TabletToggled.class, e -> overlays.close());
+        events.subscribe(GameEvent.PlayerHidden.class, e -> overlays.close());
         events.subscribe(GameEvent.PepinEscaped.class, e -> showSubtitle(e.out()
                 ? "* La musique s'arrête. Un ressort grince sous la trappe... *"
                 : "* La boîte se referme dans la fosse d'orchestre *"));
@@ -213,6 +267,8 @@ final class NightScreen implements Screen {
             cassetteLines = wrap(CASSETTES[Math.min(night, CASSETTES.length) - 1], CASSETTE_LINE);
             cassetteTime = 0;
             typedChars = 0;
+            glitchTimer = 0;
+            glitchDone = false;
             subtitleTimer = 0;
             staticTimer = 0;
             timeScale = 1.0;
@@ -225,6 +281,13 @@ final class NightScreen implements Screen {
             thunderDelay = 0;
             goldenRoom = null;
             crashTimer = 0;
+            fadeIn = FADE_IN;
+            arrived = false;
+            cupFallen = false;
+            lampOff = 0;
+            shadowSide = null;
+            faceRoom = null;
+            overlays.close();
         }
     }
 
@@ -251,8 +314,24 @@ final class NightScreen implements Screen {
             updateCassette(dt);
             return;
         }
+        if (!arrived) {
+            // La porte de la régie claque derrière le veilleur
+            arrived = true;
+            sound.thud();
+        }
+        fadeIn = Math.max(0, fadeIn - dt);
+        overlays.update(dt);
         // En mode test (F2), les effets suivent le temps de jeu accéléré
         double gameDt = dt * timeScale;
+        lampOff = Math.max(0, lampOff - gameDt);
+        shadowTimer = Math.max(0, shadowTimer - gameDt);
+        if (shadowTimer == 0) {
+            shadowSide = null;
+        }
+        faceTimer = Math.max(0, faceTimer - gameDt);
+        if (faceTimer == 0) {
+            faceRoom = null;
+        }
         staticTimer = Math.max(0, staticTimer - dt);
         subtitleTimer = Math.max(0, subtitleTimer - dt);
         noseTimer = Math.max(0, noseTimer - dt);
@@ -274,13 +353,31 @@ final class NightScreen implements Screen {
     }
 
     private void updateCassette(double dt) {
-        cassetteTime += dt;
         int total = cassetteLength();
+        // La bande se dérègle une fois, au milieu : elle s'arrête, quelque chose murmure
+        if (glitchTimer > 0) {
+            glitchTimer = Math.max(0, glitchTimer - dt);
+            reelAngle += dt * (Math.random() < 0.5 ? -9 : 14);
+            if (glitchTimer == 0) {
+                sound.tape(true);
+            }
+            return;
+        }
+        if (!glitchDone && typedChars >= total * GLITCH_AT && typedChars < total) {
+            glitchDone = true;
+            glitchTimer = GLITCH_DURATION;
+            sound.tape(false);
+            sound.tapeGlitch();
+            pulse = 1.0;
+            return;
+        }
+        cassetteTime += dt;
+        reelAngle += dt * (typedChars < total ? 3.4 : 1.2);
         int visible = (int) Math.min(total, cassetteTime * TYPE_SPEED);
         if (visible > typedChars) {
             String text = String.join(" ", cassetteLines);
             for (int i = typedChars; i < visible && i < text.length(); i++) {
-                if (text.charAt(i) != ' ' && i % 2 == 0) {
+                if (text.charAt(i) != ' ' && i % 3 == 0) {
                     sound.typewriter();
                     break;
                 }
@@ -408,12 +505,18 @@ final class NightScreen implements Screen {
         }
         if (game.getOffice().getCameras().isOpen()) {
             drawCameraView(gc);
+        } else if (game.getOffice().isHidden()) {
+            drawHidden(gc);
         } else {
             drawOffice(gc);
         }
         drawPulse(gc);
         drawTabletBar(gc);
         drawHud(gc);
+        overlays.render(gc);
+        if (fadeIn > 0 && !isFrozen()) {
+            Draw.shade(gc, fadeIn / FADE_IN);
+        }
         if (titleCard > 0) {
             drawTitleCard(gc);
         } else if (cassetteActive) {
@@ -447,6 +550,9 @@ final class NightScreen implements Screen {
             }
             return;
         }
+        if (overlays.onKey(event)) {
+            return;
+        }
         if (code == KeyCode.P || code == KeyCode.ESCAPE) {
             game.releaseControls();
             game.pause();
@@ -454,6 +560,13 @@ final class NightScreen implements Screen {
         }
         int camera = cameraNumber(event);
         switch (code) {
+            case S -> game.toggleHide();
+            case F -> game.setFuseReset(true);
+            case J -> {
+                if (canUseDesk()) {
+                    overlays.open(DeskOverlays.Kind.JOURNAL);
+                }
+            }
             case Q -> game.toggleLeftDoor();
             case E -> game.toggleRightDoor();
             case A -> game.setLeftLight(true);
@@ -478,6 +591,7 @@ final class NightScreen implements Screen {
             case A -> game.setLeftLight(false);
             case D -> game.setRightLight(false);
             case R -> game.setWinding(false);
+            case F -> game.setFuseReset(false);
             default -> {
                 // Les autres touches ne sont pas maintenues.
             }
@@ -490,13 +604,22 @@ final class NightScreen implements Screen {
             return;
         }
         boolean open = game.getOffice().getCameras().isOpen();
-        if (!open && Draw.inside(x, y, BTN_X, LIGHT_Y, BTN_W, LIGHT_H)) {
+        if (!open && !overlays.isOpen() && Draw.inside(x, y, FUSE_X, FUSE_Y, FUSE_W, FUSE_H)) {
+            game.setFuseReset(true);
+        } else if (!open && Draw.inside(x, y, BTN_X, LIGHT_Y, BTN_W, LIGHT_H)) {
             game.setLeftLight(true);
         } else if (!open && Draw.inside(x, y, RIGHT_BTN_X, LIGHT_Y, RIGHT_BTN_W, LIGHT_H)) {
             game.setRightLight(true);
         } else if (open && Draw.inside(x, y, ORGAN_X, ORGAN_Y, ORGAN_W, ORGAN_H)) {
             game.setWinding(true);
         }
+    }
+
+    @Override
+    public void onMouseMove(double x, double y) {
+        mouseX = x;
+        mouseY = y;
+        overlays.onMouseMove(x, y);
     }
 
     @Override
@@ -521,6 +644,27 @@ final class NightScreen implements Screen {
                 game.returnToMenu();
             }
             return;
+        }
+        if (overlays.onClick(x, y)) {
+            return;
+        }
+        if (!game.getOffice().getCameras().isOpen() && Draw.inside(x, y, HIDE_X, HIDE_Y, HIDE_W, HIDE_H)) {
+            game.toggleHide();
+            return;
+        }
+        if (canUseDesk()) {
+            if (Draw.inside(x, y, SAFE_X, SAFE_Y, SAFE_W, SAFE_H)) {
+                overlays.open(DeskOverlays.Kind.SAFE);
+                return;
+            }
+            if (Draw.inside(x, y, NOTE_X, NOTE_Y, NOTE_W, NOTE_H)) {
+                overlays.open(DeskOverlays.Kind.JOURNAL);
+                return;
+            }
+            if (Draw.inside(x, y, CUT_X, CUT_Y, CUT_W, CUT_H)) {
+                overlays.open(DeskOverlays.Kind.ARTICLE);
+                return;
+            }
         }
         if (Draw.inside(x, y, PAUSE_X, PAUSE_Y, PAUSE_W, PAUSE_H)) {
             game.releaseControls();
@@ -604,6 +748,35 @@ final class NightScreen implements Screen {
         }
     }
 
+    /** Ce que le metteur en scène de la peur fait apparaître à l'écran. */
+    private void onScare(TerrorDirector.Scare scare, double pan) {
+        String side = pan < 0 ? "à gauche" : "à droite";
+        switch (scare) {
+            case FOOTSTEPS -> showSubtitle("* Des pas traînants, " + side + " *");
+            case DOOR_CREAK -> showSubtitle("* Une porte grince, quelque part " + side + " *");
+            case OBJECT_FALL -> {
+                cupFallen = true;
+                showSubtitle("* La tasse vient de tomber du bureau *");
+            }
+            case LIGHT_FLICKER -> lampOff = 1.6;
+            case WARPED_MUSIC -> showSubtitle("* L'orgue joue tout seul, de travers *");
+            case LITTLE_GIRL -> showSubtitle("* Une petite fille fredonne... tout près *");
+            case DISTANT_LAUGH -> showSubtitle("* Un rire de femme, au loin, qui se déforme *");
+            case SHADOW -> {
+                shadowSide = pan < 0 ? Door.Side.LEFT : Door.Side.RIGHT;
+                shadowTimer = 9;
+            }
+            case CAMERA_FACE -> {
+                java.util.List<Room> rooms = Room.withCameras();
+                faceRoom = rooms.get((int) (Math.random() * rooms.size()));
+                faceTimer = 12;
+            }
+            default -> {
+                // Silence et surtension : gérés par le son et par le disjoncteur.
+            }
+        }
+    }
+
     private void showSubtitle(String text) {
         subtitle = text;
         subtitleTimer = SUBTITLE_DURATION;
@@ -618,8 +791,12 @@ final class NightScreen implements Screen {
             leftLit = Draw.render(DOOR_W, DOOR_H, g -> paintCorridor(g, Room.COULOIR_GAUCHE, true));
             rightDark = Draw.render(RIGHT_DOOR_W, RIGHT_DOOR_H, g -> paintCorridor(g, Room.COULOIR_DROIT, false));
             rightLit = Draw.render(RIGHT_DOOR_W, RIGHT_DOOR_H, g -> paintCorridor(g, Room.COULOIR_DROIT, true));
+            officeShadow = Draw.render(W, H, this::paintOfficeShadow);
         }
         gc.drawImage(officeBackground, 0, 0);
+        drawFuseBox(gc);
+        drawSafe(gc);
+        drawCup(gc);
         drawHallucinationOnWall(gc);
         if (noseTimer > 0) {
             gc.setFill(new RadialGradient(0, 0, NOSE_X, NOSE_Y, 26, false, CycleMethod.NO_CYCLE,
@@ -629,12 +806,17 @@ final class NightScreen implements Screen {
         }
         drawLeftDoor(gc);
         drawRightDoor(gc);
-        drawDoorButton(gc, BTN_X, BTN_Y, game.getOffice().getLeftDoor().isClosed(), false, "[Q]");
+        drawDoorButton(gc, BTN_X, BTN_Y, game.getOffice().getLeftDoor().isClosed(), false, "Q");
         drawDoorButton(gc, RIGHT_BTN_X, RIGHT_BTN_Y, game.getOffice().getRightDoor().isClosed(),
-                game.getOffice().getRightDoor().isBlocked(), "[E]");
-        drawLightButton(gc, BTN_X, game.getOffice().getLeftLight().isOn(), "[A]");
-        drawLightButton(gc, RIGHT_BTN_X, game.getOffice().getRightLight().isOn(), "[D]");
+                game.getOffice().getRightDoor().isBlocked(), "E");
+        drawLightButton(gc, BTN_X, game.getOffice().getLeftLight().isOn(), "A");
+        drawLightButton(gc, RIGHT_BTN_X, game.getOffice().getRightLight().isOn(), "D");
         Draw.grain(gc, 575, 444, 180, 100, 90, 0.35);
+        // Pénombre : seule la lampe de bureau éclaire vraiment (et parfois, elle lâche)
+        gc.drawImage(officeShadow, 0, 0);
+        if (lampOff > 0) {
+            Draw.shade(gc, Math.random() < 0.3 ? 0.35 : 0.62);
+        }
 
         if (game.getPower().isPowerOut()) {
             drawBlackout(gc);
@@ -644,40 +826,344 @@ final class NightScreen implements Screen {
             gc.setFill(Color.rgb(220, 230, 255, flash * 0.5));
             gc.fillRect(0, 0, W, H);
         }
-        Draw.grain(gc, 250, 0.10);
-        Draw.overlay(gc, 0, 0, 0.92);
+        Draw.grain(gc, 280, 0.12);
+        Ui.filmDamage(gc);
         if (flicker > 0) {
             Draw.shade(gc, flicker);
         }
     }
 
+    /**
+     * Pénombre de la régie : un voile noir, plus épais en haut, percé par les
+     * portes (pour que les lampes des couloirs gardent leur effet) et réchauffé
+     * autour de la lampe de bureau.
+     */
+    private void paintOfficeShadow(GraphicsContext g) {
+        g.setFill(new LinearGradient(0, 0, 0, H, false, CycleMethod.NO_CYCLE,
+                new Stop(0, Color.rgb(0, 0, 0, 0.62)), new Stop(0.55, Color.rgb(0, 0, 0, 0.32)),
+                new Stop(1, Color.rgb(0, 0, 0, 0.45))));
+        g.fillRect(0, 0, W, H);
+        g.clearRect(DOOR_X, DOOR_Y, DOOR_W, DOOR_H);
+        g.clearRect(RIGHT_DOOR_X, RIGHT_DOOR_Y, RIGHT_DOOR_W, RIGHT_DOOR_H);
+        g.setFill(new RadialGradient(0, 0, 470, 540, 330, false, CycleMethod.NO_CYCLE,
+                new Stop(0, Color.rgb(255, 150, 80, 0.14)), new Stop(1, Color.TRANSPARENT)));
+        g.fillOval(140, 210, 660, 660);        // Vignettage et lignes de balayage, dans la même image pour ne la dessiner qu'une fois
+        Draw.scanlines(g, 0.05);
+        Draw.vignette(g, 0.94);
+    }
+
+    /** Disjoncteur mural : voyant rouge et levier baissé quand un fusible a sauté. */
+    private void drawFuseBox(GraphicsContext gc) {
+        FuseBox fuses = game.getOffice().getFuseBox();
+        boolean tripped = fuses.getTripped() != null;
+        boolean hover = Draw.inside(mouseX, mouseY, FUSE_X, FUSE_Y, FUSE_W, FUSE_H) && tripped;
+        gc.setFill(Color.rgb(0, 0, 0, 0.5));
+        gc.fillRect(FUSE_X + 5, FUSE_Y + 6, FUSE_W, FUSE_H);
+        gc.setFill(new LinearGradient(FUSE_X, 0, FUSE_X + FUSE_W, 0, false, CycleMethod.NO_CYCLE,
+                new Stop(0, Color.web("#3a3430")), new Stop(0.5, Color.web("#57504a")), new Stop(1, Color.web("#2e2926"))));
+        gc.fillRect(FUSE_X, FUSE_Y, FUSE_W, FUSE_H);
+        gc.setStroke(hover ? Draw.CREAM : Color.rgb(0, 0, 0, 0.7));
+        gc.setLineWidth(hover ? 2 : 1);
+        gc.strokeRect(FUSE_X + 0.5, FUSE_Y + 0.5, FUSE_W - 1, FUSE_H - 1);
+        Ui.warningIcon(gc, FUSE_X + 16, FUSE_Y + 16, 8, Draw.AMBER);
+        Draw.text(gc, "DANGER", FUSE_X + 30, FUSE_Y + 17, assets.ui(10), Draw.AMBER, TextAlignment.LEFT);
+        // Voyant
+        boolean blink = tripped && ((int) (time * 3)) % 2 == 0;
+        gc.setFill(blink ? Color.web("#ff2a3a") : tripped ? Color.web("#5a0a10") : Color.web("#3a6a3a"));
+        gc.fillOval(FUSE_X + FUSE_W - 22, FUSE_Y + 9, 12, 12);
+        // Levier : en bas s'il a sauté, remonte pendant le réarmement
+        double ratio = tripped ? fuses.getProgress() : 1.0;
+        double leverY = FUSE_Y + 86 - 50 * ratio;
+        gc.setFill(Color.web("#1a1614"));
+        gc.fillRect(FUSE_X + FUSE_W / 2 - 4, FUSE_Y + 32, 8, 60);
+        gc.setFill(tripped ? Color.web("#b01827") : Color.web("#8a7d70"));
+        gc.fillRect(FUSE_X + FUSE_W / 2 - 18, leverY - 6, 36, 12);
+        if (tripped) {
+            Ui.keycap(gc, "F", FUSE_X + 8, FUSE_Y + FUSE_H - 14, assets.ui(11));
+            if (fuses.isResetting()) {
+                Ui.gauge(gc, FUSE_X + 30, FUSE_Y + FUSE_H - 18, FUSE_W - 38, 8, 6, fuses.getProgress(), Draw.AMBER);
+            }
+        }
+    }
+
+    /** Coffre du directeur, posé au sol à droite du bureau. */
+    private void drawSafe(GraphicsContext gc) {
+        boolean open = game.getOffice().getSafe().isOpen();
+        boolean hover = Draw.inside(mouseX, mouseY, SAFE_X, SAFE_Y, SAFE_W, SAFE_H) && canUseDesk();
+        gc.setFill(Color.rgb(0, 0, 0, 0.55));
+        gc.fillRect(SAFE_X + 6, SAFE_Y + 6, SAFE_W, SAFE_H);
+        gc.setFill(new LinearGradient(0, SAFE_Y, 0, SAFE_Y + SAFE_H, false, CycleMethod.NO_CYCLE,
+                new Stop(0, Color.web("#3c3a36")), new Stop(1, Color.web("#1e1c1a"))));
+        gc.fillRect(SAFE_X, SAFE_Y, SAFE_W, SAFE_H);
+        gc.setStroke(hover ? Draw.CREAM : Color.rgb(176, 141, 69, 0.5));
+        gc.setLineWidth(hover ? 2 : 1);
+        gc.strokeRect(SAFE_X + 4, SAFE_Y + 4, SAFE_W - 8, SAFE_H - 8);
+        double cx = SAFE_X + SAFE_W / 2;
+        double cy = SAFE_Y + SAFE_H / 2;
+        gc.setFill(Color.web("#8a7d70"));
+        gc.fillOval(cx - 16, cy - 16, 32, 32);
+        gc.setStroke(Color.web("#1a1614"));
+        gc.setLineWidth(2);
+        double a = time * 0.3;
+        gc.strokeLine(cx, cy, cx + Math.cos(a) * 12, cy + Math.sin(a) * 12);
+        if (open) {
+            gc.setFill(Color.rgb(0, 0, 0, 0.7));
+            gc.fillRect(SAFE_X + 8, SAFE_Y + 8, SAFE_W - 16, SAFE_H - 16);
+            Draw.text(gc, "OUVERT", cx, cy, assets.ui(11), Draw.GOLD, TextAlignment.CENTER);
+        }
+        if (hover) {
+            Draw.shadowText(gc, "COFFRE", cx, SAFE_Y - 12, assets.ui(13), Draw.CREAM, TextAlignment.CENTER);
+        }
+    }
+
+    /** La tasse : sur le bureau, ou en miettes par terre si elle est tombée. */
+    private void drawCup(GraphicsContext gc) {
+        if (!cupFallen) {
+            gc.setFill(Color.web("#d8cfc0"));
+            gc.fillRoundRect(822, 528, 28, 30, 6, 6);
+            gc.setStroke(Color.web("#d8cfc0"));
+            gc.setLineWidth(3);
+            gc.strokeOval(846, 534, 12, 14);
+            gc.setFill(Color.web("#2a1a10"));
+            gc.fillOval(822, 524, 28, 8);
+            return;
+        }
+        gc.setFill(Color.web("#2a1a10"));
+        gc.fillOval(800, 676, 70, 14);
+        gc.setFill(Color.web("#cfc6b4"));
+        double[][] shards = {{812, 672, 10, 6}, {838, 680, 14, 7}, {860, 670, 8, 5}, {826, 686, 6, 4}};
+        for (double[] sh : shards) {
+            gc.fillPolygon(new double[]{sh[0], sh[0] + sh[2], sh[0] + sh[2] * 0.4},
+                    new double[]{sh[1], sh[1] + sh[3] * 0.3, sh[1] + sh[3]}, 3);
+        }
+    }
+
+    /** Sous le bureau : presque rien à voir, seulement le bas de la pièce par une fente. */
+    private void drawHidden(GraphicsContext gc) {
+        Draw.clear(gc, Color.web("#050303"));
+        // La fente de lumière entre le plateau et le sol
+        gc.setFill(new LinearGradient(0, 470, 0, 640, false, CycleMethod.NO_CYCLE,
+                new Stop(0, Color.TRANSPARENT), new Stop(0.5, Color.rgb(90, 60, 40, 0.35)),
+                new Stop(1, Color.TRANSPARENT)));
+        gc.fillRect(160, 470, W - 320, 170);
+        // Pieds du bureau
+        gc.setFill(Color.web("#120a07"));
+        gc.fillRect(140, 300, 60, 420);
+        gc.fillRect(W - 200, 300, 60, 420);
+        gc.fillRect(0, 0, W, 300);
+        gc.setFill(new LinearGradient(0, 300, 0, 330, false, CycleMethod.NO_CYCLE,
+                new Stop(0, Color.web("#1e130c")), new Stop(1, Color.TRANSPARENT)));
+        gc.fillRect(0, 300, W, 30);
+        if (game.getPepin().isSearching()) {
+            // Quelque chose passe devant la fente
+            double px = (time * 260) % (W + 400) - 200;
+            Draw.spriteAt(gc, assets.silhouette("pepin", "idle_1", 360), px, 690);
+            Ui.alert(gc, "QUELQUE CHOSE FOUILLE LA RÉGIE... PAS UN BRUIT", W / 2, 120, assets.ui(16), time);
+        } else {
+            Draw.shadowText(gc, "Vous êtes caché sous le bureau.", W / 2, 150, assets.serif(26), Draw.TEXT,
+                    TextAlignment.CENTER);
+            Draw.text(gc, "Caché, vous ne pouvez rien utiliser. Pépin ne vous trouvera pas si vous restez silencieux.",
+                    W / 2, 192, assets.ui(15), Draw.TEXT_DIM, TextAlignment.CENTER);
+            Draw.text(gc, "Les autres clowns, eux, entrent par les portes ouvertes.",
+                    W / 2, 214, assets.ui(15), Draw.TEXT_DIM, TextAlignment.CENTER);
+        }
+        Ui.hints(gc, W / 2, 252, TextAlignment.CENTER, assets.ui(14), "S", "Sortir de la cachette");
+        Draw.grain(gc, 400, 0.18);
+        Draw.overlay(gc, 0, 0.1, 0.95);
+    }
+
+    private boolean canUseDesk() {
+        return game.getState() == GameState.PLAYING && !game.getOffice().getCameras().isOpen()
+                && !game.getOffice().isHidden() && !game.getPower().isPowerOut() && !isFrozen();
+    }
+
     /** Tout ce qui ne bouge jamais dans la régie, dessiné une seule fois. */
     private void paintOfficeBackground(GraphicsContext gc) {
-        // Mur : papier peint rayé de cirque, délavé
-        Draw.clear(gc, Color.web("#1a1012"));
-        for (double x = 0; x < W; x += 64) {
-            gc.setFill(Color.rgb(90, 20, 28, 0.22));
-            gc.fillRect(x, 0, 32, 470);
+        Draw.clear(gc, Color.web("#160d0f"));
+        // Papier peint : larges rayures bordeaux et petits losanges dorés
+        for (double x = 0; x < W; x += 80) {
+            gc.setFill(Color.web("#3a0f16"));
+            gc.fillRect(x, 0, 40, 440);
+            gc.setFill(Color.web("#250a0e"));
+            gc.fillRect(x + 40, 0, 40, 440);
+            for (double y = 40; y < 430; y += 64) {
+                Ui.diamond(gc, x + 60, y, 4, Color.rgb(201, 162, 74, 0.10));
+            }
         }
-        gc.setFill(Color.web("#140b0c"));
-        gc.fillRect(0, 470, W, 120);
-        gc.setFill(Color.web("#3a2a1c"));
-        gc.fillRect(0, 466, W, 6);
-        gc.setFill(new LinearGradient(0, 590, 0, H, false, CycleMethod.NO_CYCLE,
-                new Stop(0, Color.web("#120c0b")), new Stop(1, Color.web("#050303"))));
-        gc.fillRect(0, 590, W, H - 590);
-        gc.setStroke(Color.rgb(0, 0, 0, 0.5));
+        // Le papier peint pourrit : moisissure, coulures, lambeaux arrachés
+        java.util.Random random = new java.util.Random(1031);
+        for (int i = 0; i < 40; i++) {
+            double r = 20 + random.nextDouble() * 80;
+            double x = random.nextDouble() * W;
+            double y = random.nextDouble() * 440;
+            gc.setFill(new RadialGradient(0, 0, x, y, r, false, CycleMethod.NO_CYCLE,
+                    new Stop(0, Color.rgb(0, 0, 0, 0.32)), new Stop(1, Color.TRANSPARENT)));
+            gc.fillOval(x - r, y - r, r * 2, r * 2);
+        }
+        for (int i = 0; i < 24; i++) {
+            double x = random.nextDouble() * W;
+            double len = 60 + random.nextDouble() * 240;
+            gc.setFill(new LinearGradient(0, 0, 0, len, false, CycleMethod.NO_CYCLE,
+                    new Stop(0, Color.rgb(25, 8, 4, 0.5)), new Stop(1, Color.TRANSPARENT)));
+            gc.fillRect(x, 0, 2 + random.nextDouble() * 6, len);
+        }
+        for (int i = 0; i < 6; i++) {
+            double x = random.nextDouble() * W;
+            double y = 80 + random.nextDouble() * 300;
+            double[] xs = new double[7];
+            double[] ys = new double[7];
+            for (int k = 0; k < 7; k++) {
+                double a = k * Math.PI * 2 / 7;
+                double rr = 12 + random.nextDouble() * 24;
+                xs[k] = x + Math.cos(a) * rr * 1.4;
+                ys[k] = y + Math.sin(a) * rr;
+            }
+            gc.setFill(Color.rgb(70, 54, 40, 0.5));
+            gc.fillPolygon(xs, ys, 7);
+        }
+        gc.setFill(new LinearGradient(0, 0, 0, 160, false, CycleMethod.NO_CYCLE,
+                new Stop(0, Color.rgb(0, 0, 0, 0.9)), new Stop(1, Color.TRANSPARENT)));
+        gc.fillRect(0, 0, W, 160);
+        cobweb(gc, 0, 0, 1);
+        cobweb(gc, W, 0, -1);
+        // Mots griffonnés au mur par l'ancien veilleur
+        gc.save();
+        gc.translate(676, 72);
+        gc.rotate(-2);
+        Draw.text(gc, "ILS NE SONT JAMAIS PARTIS", 0, 0, assets.scrawl(18), Color.rgb(150, 14, 24, 0.55),
+                TextAlignment.CENTER);
+        gc.restore();
+        gc.save();
+        gc.translate(1236, 330);
+        gc.rotate(-90);
+        Draw.text(gc, "6 h... 6 h... 6 h...", 0, 0, assets.scrawl(12), Color.rgb(150, 14, 24, 0.4),
+                TextAlignment.CENTER);
+        gc.restore();
+        // Cimaise dorée
+        gc.setFill(Color.web("#5c4420"));
+        gc.fillRect(0, 436, W, 9);
+        gc.setFill(Color.web("#c9a24a"));
+        gc.fillRect(0, 436, W, 2);
+        // Lambris en bois
+        gc.setFill(new LinearGradient(0, 445, 0, 590, false, CycleMethod.NO_CYCLE,
+                new Stop(0, Color.web("#3b2418")), new Stop(1, Color.web("#1f120c"))));
+        gc.fillRect(0, 445, W, 145);
+        for (double x = 12; x < W; x += 124) {
+            gc.setStroke(Color.rgb(0, 0, 0, 0.5));
+            gc.setLineWidth(2);
+            gc.strokeRect(x, 462, 104, 110);
+            gc.setStroke(Color.rgb(255, 220, 160, 0.06));
+            gc.setLineWidth(1);
+            gc.strokeRect(x + 4, 466, 96, 102);
+        }
+        gc.setFill(Color.web("#0e0806"));
+        gc.fillRect(0, 586, W, 8);
+        paintFloor(gc);
+        // Guirlande d'ampoules éteintes sous le plafond
+        gc.setStroke(Color.rgb(20, 14, 10));
         gc.setLineWidth(2);
-        for (double x = -400; x < W + 400; x += 90) {
-            gc.strokeLine(W / 2 + (x - W / 2) * 0.35, 590, x, H);
+        for (double x0 = -40; x0 < W; x0 += 320) {
+            double px = x0;
+            double py = 14;
+            for (double x = x0; x <= x0 + 320; x += 8) {
+                double t = (x - x0) / 320;
+                double y = 14 + 34 * 4 * t * (1 - t);
+                gc.strokeLine(px, py, x, y);
+                px = x;
+                py = y;
+            }
+            for (int i = 1; i < 8; i++) {
+                double t = i / 8.0;
+                double bx = x0 + 320 * t;
+                double by = 18 + 34 * 4 * t * (1 - t);
+                if ((i + (int) x0) % 3 == 0) {
+                    // Ampoule brisée : il ne reste que la douille
+                    gc.setFill(Color.web("#1a1410"));
+                    gc.fillRect(bx - 3, by - 4, 6, 5);
+                } else {
+                    Ui.bulb(gc, bx, by, false);
+                }
+            }
         }
         drawPoster(gc);
         drawClipping(gc);
         drawDesk(gc);
+        paintControlPlate(gc, BTN_X);
+        paintControlPlate(gc, RIGHT_BTN_X);
         // Lumière chaude de la lampe de bureau
         gc.setFill(new RadialGradient(0, 0, 470, 520, 420, false, CycleMethod.NO_CYCLE,
-                new Stop(0, Color.rgb(255, 190, 110, 0.20)), new Stop(1, Color.TRANSPARENT)));
+                new Stop(0, Color.rgb(255, 190, 110, 0.18)), new Stop(1, Color.TRANSPARENT)));
         gc.fillRect(0, 0, W, H);
+    }
+
+    /** Toile d'araignée dans un coin du plafond. */
+    private static void cobweb(GraphicsContext gc, double x, double y, int dir) {
+        gc.setStroke(Color.rgb(200, 190, 180, 0.13));
+        gc.setLineWidth(1);
+        for (int i = 0; i <= 6; i++) {
+            double a = i * Math.PI / 12;
+            gc.strokeLine(x, y, x + dir * Math.cos(a) * 150, y + Math.sin(a) * 150);
+        }
+        for (double r = 25; r <= 125; r += 25) {
+            double px = x + dir * r;
+            double py = y;
+            for (int i = 1; i <= 6; i++) {
+                double a = i * Math.PI / 12;
+                double nx = x + dir * Math.cos(a) * r;
+                double ny = y + Math.sin(a) * r;
+                gc.strokeLine(px, py, (px + nx) / 2 + dir * 3, (py + ny) / 2 + 3);
+                gc.strokeLine((px + nx) / 2 + dir * 3, (py + ny) / 2 + 3, nx, ny);
+                px = nx;
+                py = ny;
+            }
+        }
+    }
+
+    /** Sol en damier noir et bordeaux, en perspective. */
+    private void paintFloor(GraphicsContext gc) {
+        double top = 594;
+        double vx = W / 2;
+        double vy = 250;
+        double[] rows = {top, 606, 622, 644, 674, 714, H + 40};
+        for (int r = 0; r + 1 < rows.length; r++) {
+            for (int c = -12; c < 12; c++) {
+                double x0 = vx + c * 150;
+                double x1 = vx + (c + 1) * 150;
+                double ya = rows[r];
+                double yb = rows[r + 1];
+                double ka = (ya - vy) / (H + 40 - vy);
+                double kb = (yb - vy) / (H + 40 - vy);
+                gc.setFill((r + c) % 2 == 0 ? Color.web("#2a1612") : Color.web("#0d0807"));
+                gc.fillPolygon(new double[]{vx + (x0 - vx) * ka, vx + (x1 - vx) * ka, vx + (x1 - vx) * kb, vx + (x0 - vx) * kb},
+                        new double[]{ya, ya, yb, yb}, 4);
+            }
+        }
+        gc.setFill(new LinearGradient(0, top, 0, H, false, CycleMethod.NO_CYCLE,
+                new Stop(0, Color.rgb(0, 0, 0, 0.7)), new Stop(1, Color.rgb(0, 0, 0, 0.2))));
+        gc.fillRect(0, top, W, H - top);
+    }
+
+    /** Plaque de commande en laiton, derrière la lampe et la porte d'un côté. */
+    private void paintControlPlate(GraphicsContext gc, double bx) {
+        double x = bx - 12;
+        double y = LIGHT_Y - 14;
+        double w = BTN_W + 24;
+        double h = BTN_Y + BTN_H + 14 - y;
+        gc.setFill(Color.rgb(0, 0, 0, 0.5));
+        gc.fillRoundRect(x + 5, y + 7, w, h, 12, 12);
+        gc.setFill(new LinearGradient(x, 0, x + w, 0, false, CycleMethod.NO_CYCLE,
+                new Stop(0, Color.web("#6b5226")), new Stop(0.5, Color.web("#a8853f")), new Stop(1, Color.web("#5a441e"))));
+        gc.fillRoundRect(x, y, w, h, 12, 12);
+        gc.setFill(new LinearGradient(0, y, 0, y + h, false, CycleMethod.NO_CYCLE,
+                new Stop(0, Color.web("#262022")), new Stop(1, Color.web("#151112"))));
+        gc.fillRoundRect(x + 5, y + 5, w - 10, h - 10, 8, 8);
+        gc.setStroke(Color.rgb(0, 0, 0, 0.6));
+        gc.setLineWidth(1);
+        gc.strokeLine(x + 12, BTN_Y - 7, x + w - 12, BTN_Y - 7);
+        for (double[] screw : new double[][]{{x + 9, y + 9}, {x + w - 9, y + 9}, {x + 9, y + h - 9}, {x + w - 9, y + h - 9}}) {
+            gc.setFill(Color.web("#d8c08a"));
+            gc.fillOval(screw[0] - 2.5, screw[1] - 2.5, 5, 5);
+        }
     }
 
     /** Le couloir vu par l'encadrement, dans le noir ou sous la lampe. */
@@ -715,6 +1201,8 @@ final class NightScreen implements Screen {
                     DOOR_Y + DOOR_H + 20 + breathe);
         } else if (silhouette && flash() > 0.3) {
             Draw.spriteAt(gc, assets.silhouette("bobo", "door", 470), DOOR_X + DOOR_W / 2, DOOR_Y + DOOR_H + 20);
+        } else if (lit && shadowSide == Door.Side.LEFT) {
+            drawApparition(gc, DOOR_X + DOOR_W / 2, "bobo", "door", 430);
         }
         drawFrame(gc, DOOR_X, DOOR_Y);
     }
@@ -729,6 +1217,8 @@ final class NightScreen implements Screen {
             double breathe = Math.sin(time * 2.2) * 4;
             Draw.spriteAt(gc, assets.sprite("mimi", "idle_2", 420),
                     RIGHT_DOOR_X + RIGHT_DOOR_W / 2, RIGHT_DOOR_Y + RIGHT_DOOR_H + 10 + breathe);
+        } else if (!closed && lit && shadowSide == Door.Side.RIGHT) {
+            drawApparition(gc, RIGHT_DOOR_X + RIGHT_DOOR_W / 2, "henry", "idle_2", 400);
         }
         if (game.getMimi().isAtEmbrasure()) {
             Draw.text(gc, "PORTE BLOQUÉE", RIGHT_DOOR_X + RIGHT_DOOR_W / 2,
@@ -737,13 +1227,34 @@ final class NightScreen implements Screen {
         drawFrame(gc, RIGHT_DOOR_X, RIGHT_DOOR_Y);
     }
 
+    /**
+     * Silhouette furtive au fond d'un couloir éclairé : elle disparaît une demi-seconde
+     * après avoir été vue. Ce n'est pas un vrai clown, mais le joueur ne le sait pas.
+     */
+    private void drawApparition(GraphicsContext gc, double cx, String character, String frame, double height) {
+        if (shadowTimer > 0.6) {
+            shadowTimer = 0.6;
+            pulse = 1.0;
+        }
+        gc.setGlobalAlpha(Math.min(0.85, shadowTimer * 1.6));
+        Draw.spriteAt(gc, assets.silhouette(character, frame, height), cx + Draw.random(-2, 2), DOOR_Y + DOOR_H - 30);
+        gc.setGlobalAlpha(1.0);
+    }
+
+    /** Encadrement de porte en bois sombre, avec moulure dorée. */
     private void drawFrame(GraphicsContext gc, double x, double y) {
-        gc.setStroke(Color.web("#2e2326"));
-        gc.setLineWidth(18);
+        gc.setStroke(Color.web("#1d1411"));
+        gc.setLineWidth(22);
         gc.strokeRect(x, y, DOOR_W, DOOR_H);
-        gc.setStroke(Color.web("#4a3a2c"));
-        gc.setLineWidth(3);
-        gc.strokeRect(x - 9, y - 9, DOOR_W + 18, DOOR_H + 18);
+        gc.setStroke(Color.web("#3e2b1d"));
+        gc.setLineWidth(6);
+        gc.strokeRect(x - 8, y - 8, DOOR_W + 16, DOOR_H + 16);
+        gc.setStroke(Color.rgb(201, 162, 74, 0.55));
+        gc.setLineWidth(1.5);
+        gc.strokeRect(x - 12, y - 12, DOOR_W + 24, DOOR_H + 24);
+        gc.setStroke(Color.rgb(0, 0, 0, 0.6));
+        gc.setLineWidth(2);
+        gc.strokeRect(x + 10, y + 10, DOOR_W - 20, DOOR_H - 20);
     }
 
     private void drawShutter(GraphicsContext gc, double x, double y, boolean hazard) {
@@ -775,46 +1286,67 @@ final class NightScreen implements Screen {
     }
 
     private void drawDoorButton(GraphicsContext gc, double bx, double by, boolean closed, boolean blocked, String key) {
-        gc.setFill(Color.web("#2a2426"));
-        gc.fillRect(bx, by, BTN_W, BTN_H);
-        gc.setStroke(blocked ? Color.web("#e0303f") : Color.web("#4a3f3a"));
-        gc.setLineWidth(2);
-        gc.strokeRect(bx + 4, by + 4, BTN_W - 8, BTN_H - 8);
         double cx = bx + BTN_W / 2;
-        if (closed) {
-            gc.setFill(new RadialGradient(0, 0, cx, by + 46, 60, false, CycleMethod.NO_CYCLE,
-                    new Stop(0, Color.rgb(255, 60, 70, 0.55)), new Stop(1, Color.TRANSPARENT)));
-            gc.fillRect(bx - 30, by - 20, BTN_W + 60, 140);
+        double cy = by + 44;
+        boolean hover = Draw.inside(mouseX, mouseY, bx, by, BTN_W, BTN_H) && !game.getOffice().getCameras().isOpen();
+        if (closed || blocked) {
+            gc.setFill(new RadialGradient(0, 0, cx, cy, 64, false, CycleMethod.NO_CYCLE,
+                    new Stop(0, Color.rgb(255, 50, 64, blocked ? 0.35 + 0.25 * Math.sin(time * 10) : 0.45)),
+                    new Stop(1, Color.TRANSPARENT)));
+            gc.fillOval(cx - 64, cy - 64, 128, 128);
         }
-        gc.setFill(closed ? Color.web("#e0303f") : Color.web("#4a1a1f"));
-        gc.fillOval(cx - 28, by + 18, 56, 56);
-        gc.setStroke(Color.web("#120808"));
-        gc.setLineWidth(3);
-        gc.strokeOval(cx - 28, by + 18, 56, 56);
-        Draw.text(gc, blocked ? "BLOQUÉE" : "PORTE", cx, by + 96, assets.ui(15),
-                blocked ? Color.web("#ff5260") : Draw.TEXT, TextAlignment.CENTER);
-        Draw.text(gc, key, cx, by + 118, assets.ui(13), Draw.TEXT_DIM, TextAlignment.CENTER);
+        // Bague en laiton puis bouton bombé
+        gc.setFill(new LinearGradient(0, cy - 32, 0, cy + 32, false, CycleMethod.NO_CYCLE,
+                new Stop(0, Color.web("#e2c98e")), new Stop(1, Color.web("#6b5226"))));
+        gc.fillOval(cx - 32, cy - 32, 64, 64);
+        gc.setFill(closed
+                ? new RadialGradient(0, 0, cx - 8, cy - 10, 34, false, CycleMethod.NO_CYCLE,
+                        new Stop(0, Color.web("#ff8a8f")), new Stop(0.45, Color.web("#e0303f")), new Stop(1, Color.web("#7a0d16")))
+                : new RadialGradient(0, 0, cx - 8, cy - 10, 34, false, CycleMethod.NO_CYCLE,
+                        new Stop(0, Color.web("#7a3a3f")), new Stop(0.5, Color.web("#4a1219")), new Stop(1, Color.web("#22070b"))));
+        gc.fillOval(cx - 26, cy - 26, 52, 52);
+        if (hover) {
+            gc.setStroke(Draw.CREAM);
+            gc.setLineWidth(2);
+            gc.strokeOval(cx - 34, cy - 34, 68, 68);
+        }
+        String state = blocked ? "BLOQUÉE" : closed ? "FERMÉE" : "OUVERTE";
+        Color stateColor = blocked ? Ui.ALERT : closed ? Color.web("#ff8a8f") : Draw.TEXT_DIM;
+        Draw.text(gc, "PORTE", cx, by + 92, assets.ui(14), Draw.TEXT, TextAlignment.CENTER);
+        Ui.keycap(gc, key, cx - 13, by + 112, assets.ui(12));
+        Draw.text(gc, state, cx, by + 132, assets.ui(11), stateColor, TextAlignment.CENTER);
     }
 
     private void drawLightButton(GraphicsContext gc, double bx, boolean on, String key) {
-        gc.setFill(Color.web("#2a2426"));
-        gc.fillRect(bx, LIGHT_Y, BTN_W, LIGHT_H);
-        gc.setStroke(on ? Draw.AMBER : Color.web("#4a3f3a"));
-        gc.setLineWidth(2);
-        gc.strokeRect(bx + 4, LIGHT_Y + 4, BTN_W - 8, LIGHT_H - 8);
-        double cx = bx + BTN_W / 2;
-        if (on) {
-            gc.setFill(new RadialGradient(0, 0, cx, LIGHT_Y + 22, 40, false, CycleMethod.NO_CYCLE,
-                    new Stop(0, Color.rgb(255, 210, 120, 0.6)), new Stop(1, Color.TRANSPARENT)));
-            gc.fillRect(bx - 20, LIGHT_Y - 18, BTN_W + 40, 80);
+        if (game.getOffice().getFuseBox().isTripped(FuseBox.Circuit.LIGHTS)) {
+            Draw.text(gc, "GRILLÉ", bx + BTN_W / 2, LIGHT_Y + 24, assets.ui(13), Ui.ALERT, TextAlignment.CENTER);
+            Draw.text(gc, "fusible", bx + BTN_W / 2, LIGHT_Y + 46, assets.ui(11), Draw.TEXT_DIM, TextAlignment.CENTER);
+            return;
         }
-        gc.setFill(on ? Color.web("#ffd27a") : Color.web("#3a3428"));
-        gc.fillOval(cx - 11, LIGHT_Y + 11, 22, 22);
-        gc.setStroke(Color.web("#120808"));
-        gc.setLineWidth(2);
-        gc.strokeOval(cx - 11, LIGHT_Y + 11, 22, 22);
-        Draw.text(gc, "LUMIÈRE " + key, cx, LIGHT_Y + 50, assets.ui(12), on ? Draw.AMBER : Draw.TEXT_DIM,
-                TextAlignment.CENTER);
+        double cx = bx + BTN_W / 2;
+        double cy = LIGHT_Y + 24;
+        boolean hover = Draw.inside(mouseX, mouseY, bx, LIGHT_Y, BTN_W, LIGHT_H) && !game.getOffice().getCameras().isOpen();
+        if (on) {
+            gc.setFill(new RadialGradient(0, 0, cx, cy, 48, false, CycleMethod.NO_CYCLE,
+                    new Stop(0, Color.rgb(255, 214, 130, 0.6)), new Stop(1, Color.TRANSPARENT)));
+            gc.fillOval(cx - 48, cy - 48, 96, 96);
+        }
+        gc.setFill(Color.web("#8a6d31"));
+        gc.fillOval(cx - 19, cy - 19, 38, 38);
+        gc.setFill(on
+                ? new RadialGradient(0, 0, cx - 4, cy - 5, 18, false, CycleMethod.NO_CYCLE,
+                        new Stop(0, Color.web("#fffbe6")), new Stop(0.5, Color.web("#ffd27a")), new Stop(1, Color.web("#c88a2a")))
+                : new RadialGradient(0, 0, cx - 4, cy - 5, 18, false, CycleMethod.NO_CYCLE,
+                        new Stop(0, Color.web("#6a5a3a")), new Stop(1, Color.web("#2a2218"))));
+        gc.fillOval(cx - 15, cy - 15, 30, 30);
+        if (hover) {
+            gc.setStroke(Draw.CREAM);
+            gc.setLineWidth(2);
+            gc.strokeOval(cx - 22, cy - 22, 44, 44);
+        }
+        double kw = Ui.keycap(gc, key, bx + 8, LIGHT_Y + 55, assets.ui(11));
+        Draw.text(gc, "LUMIÈRE", bx + 8 + kw + 5, LIGHT_Y + 55, assets.ui(11), on ? Draw.AMBER : Draw.TEXT_DIM,
+                TextAlignment.LEFT);
     }
 
     private void drawPoster(GraphicsContext gc) {
@@ -836,6 +1368,23 @@ final class NightScreen implements Screen {
         gc.fillOval(-3, -18, 4, 4);
         Draw.text(gc, "DERNIÈRE REPRÉSENTATION", 0, 125, assets.ui(13), Draw.CREAM, TextAlignment.CENTER);
         Draw.text(gc, "31 OCTOBRE 1994", 0, 145, assets.ui(15), Draw.CREAM, TextAlignment.CENTER);
+        // Affiche vieillie : taches, éclaboussures de sang, coin arraché
+        java.util.Random random = new java.util.Random(77);
+        for (int i = 0; i < 16; i++) {
+            double r = 4 + random.nextDouble() * 24;
+            gc.setFill(Color.rgb(20, 6, 4, 0.2 + random.nextDouble() * 0.2));
+            gc.fillOval(-125 + random.nextDouble() * 250 - r / 2, -160 + random.nextDouble() * 330 - r / 2, r, r);
+        }
+        gc.setFill(Color.rgb(110, 6, 14, 0.8));
+        for (int i = 0; i < 9; i++) {
+            double r = 2 + random.nextDouble() * 6;
+            gc.fillOval(62 + random.nextDouble() * 48, -152 + random.nextDouble() * 56, r, r);
+        }
+        gc.fillRect(94, -118, 3, 64);
+        gc.setFill(Color.web("#1a0c0e"));
+        gc.fillPolygon(new double[]{125, 125, 72, 92}, new double[]{112, 170, 170, 142}, 4);
+        gc.setFill(Color.rgb(0, 0, 0, 0.25));
+        gc.fillRect(-125, -160, 250, 330);
         gc.restore();
     }
 
@@ -883,28 +1432,61 @@ final class NightScreen implements Screen {
     }
 
     private void drawDesk(GraphicsContext gc) {
-        // Plateau
-        gc.setFill(Color.web("#2a1d16"));
-        gc.fillPolygon(new double[]{400, 900, 980, 320}, new double[]{560, 560, H, H}, 4);
-        gc.setFill(Color.web("#4a3426"));
-        gc.fillRect(400, 556, 500, 8);
-        // Écran de contrôle cathodique
-        gc.setFill(Color.web("#1c1a19"));
-        gc.fillRect(560, 430, 210, 135);
-        gc.setFill(Color.web("#0b120c"));
-        gc.fillRect(575, 444, 180, 100);
-        Draw.text(gc, "CAM -- REC", 665, 494, assets.ui(14), Color.rgb(120, 200, 120, 0.7), TextAlignment.CENTER);
-        // Lampe de bureau
-        gc.setFill(Color.web("#1a1414"));
-        gc.fillRect(462, 520, 16, 40);
-        gc.fillPolygon(new double[]{440, 500, 488, 452}, new double[]{520, 520, 490, 490}, 4);
-        gc.setFill(Color.rgb(255, 210, 140, 0.9));
-        gc.fillOval(458, 514, 24, 10);
-        // Tasse
-        gc.setFill(Color.web("#d8cfc0"));
-        gc.fillRect(820, 530, 30, 30);
-        gc.setFill(Color.web("#2a1a10"));
-        gc.fillOval(820, 526, 30, 9);
+        // Plateau en bois, en perspective, avec veinage
+        double[] xs = {400, 900, 990, 310};
+        double[] ys = {560, 560, H, H};
+        gc.setFill(new LinearGradient(0, 560, 0, H, false, CycleMethod.NO_CYCLE,
+                new Stop(0, Color.web("#4a3122")), new Stop(1, Color.web("#1e130c"))));
+        gc.fillPolygon(xs, ys, 4);
+        gc.setStroke(Color.rgb(0, 0, 0, 0.25));
+        gc.setLineWidth(1);
+        for (int i = 1; i < 9; i++) {
+            double t = i / 9.0;
+            gc.strokeLine(400 + 500 * t, 560, 310 + 680 * t, H);
+        }
+        gc.setFill(Color.web("#6b4a30"));
+        gc.fillRect(400, 554, 500, 8);
+        gc.setFill(Color.rgb(255, 220, 170, 0.25));
+        gc.fillRect(400, 554, 500, 2);
+        // Moniteur cathodique, avec sa lueur verte
+        gc.setFill(Color.rgb(0, 0, 0, 0.5));
+        gc.fillRoundRect(566, 436, 210, 132, 14, 14);
+        gc.setFill(new LinearGradient(0, 428, 0, 562, false, CycleMethod.NO_CYCLE,
+                new Stop(0, Color.web("#2e2a27")), new Stop(1, Color.web("#151312"))));
+        gc.fillRoundRect(558, 428, 214, 134, 14, 14);
+        gc.setFill(Color.web("#081109"));
+        gc.fillRoundRect(574, 442, 182, 100, 18, 18);
+        gc.setFill(new RadialGradient(0, 0, 665, 492, 110, false, CycleMethod.NO_CYCLE,
+                new Stop(0, Color.rgb(90, 200, 110, 0.22)), new Stop(1, Color.TRANSPARENT)));
+        gc.fillRoundRect(574, 442, 182, 100, 18, 18);
+        Draw.text(gc, "CAM -- REC", 665, 486, assets.ui(14), Color.rgb(140, 220, 140, 0.8), TextAlignment.CENTER);
+        Draw.text(gc, "MALVAUX SÉCURITÉ", 665, 506, assets.ui(9), Color.rgb(140, 220, 140, 0.45), TextAlignment.CENTER);
+        gc.setFill(Color.web("#3a3532"));
+        gc.fillRect(640, 562, 50, 6);
+        gc.setFill(Color.rgb(90, 220, 110, 0.9));
+        gc.fillOval(752, 548, 6, 6);
+        // Lampe de bureau en laiton
+        gc.setFill(Color.web("#2a1f14"));
+        gc.fillOval(446, 552, 48, 10);
+        gc.setFill(Color.web("#8a6d31"));
+        gc.fillRect(467, 518, 6, 38);
+        gc.setFill(new LinearGradient(440, 0, 500, 0, false, CycleMethod.NO_CYCLE,
+                new Stop(0, Color.web("#2a4a2e")), new Stop(0.5, Color.web("#3f6e45")), new Stop(1, Color.web("#1e3621"))));
+        gc.fillPolygon(new double[]{436, 504, 490, 450}, new double[]{522, 522, 494, 494}, 4);
+        gc.setFill(Color.rgb(255, 214, 150, 0.95));
+        gc.fillOval(452, 518, 36, 8);
+        // Carnet du veilleur (la tasse est dessinée à part : elle peut tomber)
+        gc.save();
+        gc.translate(360, 640);
+        gc.rotate(-8);
+        gc.setFill(Color.web("#bfb39a"));
+        gc.fillRect(0, 0, 90, 60);
+        gc.setStroke(Color.rgb(60, 50, 40, 0.5));
+        gc.setLineWidth(1);
+        for (double ly = 12; ly < 56; ly += 8) {
+            gc.strokeLine(8, ly, 82, ly);
+        }
+        gc.restore();
     }
 
     /** Coupure de courant : noir presque total, puis Henry et sa mélodie dans la porte gauche. */
@@ -948,6 +1530,12 @@ final class NightScreen implements Screen {
         if (room == Room.FOSSE_ORCHESTRE) {
             drawPepin(gc);
         }
+        drawClue(gc, room);
+        if (faceRoom == room && Math.random() < 0.85) {
+            gc.setGlobalAlpha(0.38 + 0.12 * Math.sin(time * 9));
+            Draw.spriteAt(gc, assets.sprite("henry", "scare_1", 620), W / 2 + 200, H + 80);
+            gc.setGlobalAlpha(1.0);
+        }
         drawCharacterOnCamera(gc, room, game.getMimi().getRoom(), "mimi", 420);
         drawCharacterOnCamera(gc, room, game.getZigEtZag().getRoom(), ZigEtZag.SPRITE_ID, 390);
         if (goldenRoom == room) {
@@ -966,7 +1554,10 @@ final class NightScreen implements Screen {
                 Draw.spriteAt(gc, assets.sprite(ZigEtZag.SPRITE_ID, "scare_1", 490), W / 2, 620);
                 gc.setGlobalAlpha(1.0);
             }
-            Draw.text(gc, "SIGNAL PERDU", W / 2, H / 2, assets.title(48), Color.WHITE, TextAlignment.CENTER);
+            Ui.panel(gc, W / 2 - 200, H / 2 - 50, 400, 100, Ui.ALERT);
+            Draw.text(gc, "SIGNAL PERDU", W / 2, H / 2 - 10, assets.title(40), Draw.CREAM, TextAlignment.CENTER);
+            Draw.text(gc, "Reprise dans " + (int) Math.ceil(cameras.getDisabledTimeRemaining(room)) + " s",
+                    W / 2, H / 2 + 26, assets.ui(14), Draw.TEXT_DIM, TextAlignment.CENTER);
         } else if (noisy) {
             gc.setFill(Color.rgb(160, 160, 160, 0.25 * Math.min(1.0, staticTimer / SWITCH_STATIC)));
             gc.fillRect(0, 0, W, H);
@@ -981,15 +1572,21 @@ final class NightScreen implements Screen {
             gc.fillRect(0, 0, W, H);
         }
 
-        Draw.shadowText(gc, room.getCameraLabel() + " - " + room.getDisplayName().toUpperCase(),
-                40, 50, assets.ui(28), Draw.CREAM, TextAlignment.LEFT);
+        Ui.vhsTracking(gc, time);
+        drawViewfinder(gc);
+        Draw.text(gc, "31.10.94  " + game.getClock().getFormattedTime() + "  ▶ PLAY", 40, 108, assets.ui(14),
+                Color.rgb(230, 225, 210, 0.7), TextAlignment.LEFT);
+        Ui.panel(gc, 24, 20, 330, 70);
         if (((int) (time * 2)) % 2 == 0) {
-            gc.setFill(Draw.RED);
-            gc.fillOval(42, 82, 14, 14);
+            gc.setFill(Ui.ALERT);
+            gc.fillOval(42, 36, 12, 12);
         }
-        Draw.text(gc, "REC", 64, 89, assets.ui(17), Draw.TEXT, TextAlignment.LEFT);
-        Draw.text(gc, "[1-8] ou [Gauche / Droite] Changer de caméra", W / 2, 22, assets.ui(15),
-                Draw.TEXT_DIM, TextAlignment.CENTER);
+        Draw.text(gc, "REC", 60, 42, assets.ui(14), Ui.ALERT, TextAlignment.LEFT);
+        Draw.text(gc, room.getCameraLabel(), 336, 42, assets.ui(14), Draw.GOLD, TextAlignment.RIGHT);
+        Draw.shadowText(gc, room.getDisplayName().toUpperCase(), 40, 70, assets.title(24), Draw.CREAM, TextAlignment.LEFT);
+        gc.setFill(Color.rgb(0, 0, 0, 0.6));
+        gc.fillRoundRect(W / 2 - 170, 14, 340, 30, 15, 15);
+        Ui.hints(gc, W / 2, 29, TextAlignment.CENTER, assets.ui(13), "1 - 8", "Caméra", "Gauche / Droite", "Défiler");
         if (room == Room.FOSSE_ORCHESTRE && !disabled) {
             drawOrganPanel(gc);
         }
@@ -1011,48 +1608,73 @@ final class NightScreen implements Screen {
     private void drawOrganPanel(GraphicsContext gc) {
         BarrelOrgan organ = game.getOffice().getOrgan();
         boolean winding = organ.isWinding();
-        gc.setFill(Color.rgb(10, 8, 8, 0.82));
-        gc.fillRoundRect(ORGAN_X, ORGAN_Y, ORGAN_W, ORGAN_H, 10, 10);
-        gc.setStroke(winding ? Draw.AMBER : Draw.GOLD);
-        gc.setLineWidth(2);
-        gc.strokeRoundRect(ORGAN_X, ORGAN_Y, ORGAN_W, ORGAN_H, 10, 10);
-        Draw.text(gc, "ORGUE DE BARBARIE", ORGAN_X + 20, ORGAN_Y + 26, assets.ui(17), Draw.CREAM, TextAlignment.LEFT);
-
-        double charge = organ.getCharge() / BarrelOrgan.MAX_CHARGE;
-        Color level = charge > 0.5 ? Color.web("#7fbf6a") : charge > 0.25 ? Draw.AMBER : Color.web("#e0303f");
-        double barX = ORGAN_X + 20;
-        double barY = ORGAN_Y + 46;
-        double barW = ORGAN_W - 110;
-        gc.setFill(Color.rgb(255, 255, 255, 0.08));
-        gc.fillRect(barX, barY, barW, 22);
-        gc.setFill(level);
-        gc.fillRect(barX, barY, barW * charge, 22);
-        Draw.text(gc, (int) Math.ceil(organ.getCharge()) + " %", barX + barW + 12, barY + 11, assets.ui(16),
-                level, TextAlignment.LEFT);
+        boolean out = game.getPepin().isOut();
+        Ui.panel(gc, ORGAN_X, ORGAN_Y, ORGAN_W, ORGAN_H, out ? Ui.ALERT : winding ? Draw.AMBER : Ui.EDGE);
+        Draw.text(gc, "ORGUE DE BARBARIE", ORGAN_X + 20, ORGAN_Y + 24, assets.ui(15), Draw.CREAM, TextAlignment.LEFT);
+        double ratio = organ.getCharge() / BarrelOrgan.MAX_CHARGE;
+        Color level = Ui.levelColor(ratio);
+        Draw.text(gc, (int) Math.ceil(organ.getCharge()) + " %", ORGAN_X + ORGAN_W - 20, ORGAN_Y + 24, assets.ui(15),
+                level, TextAlignment.RIGHT);
+        Ui.gauge(gc, ORGAN_X + 20, ORGAN_Y + 44, ORGAN_W - 40, 16, 12, ratio, level);
 
         // Manivelle qui tourne quand on la tient
-        double cx = ORGAN_X + ORGAN_W - 40;
+        double cx = ORGAN_X + ORGAN_W - 44;
         double cy = ORGAN_Y + 100;
         double angle = winding ? time * 8 : 0.6;
+        gc.setFill(Color.rgb(255, 255, 255, 0.05));
+        gc.fillOval(cx - 26, cy - 26, 52, 52);
         gc.setStroke(Draw.GOLD);
         gc.setLineWidth(4);
-        gc.strokeOval(cx - 4, cy - 4, 8, 8);
-        gc.strokeLine(cx, cy, cx + Math.cos(angle) * 22, cy + Math.sin(angle) * 22);
+        gc.strokeLine(cx, cy, cx + Math.cos(angle) * 20, cy + Math.sin(angle) * 20);
+        gc.setFill(Draw.GOLD);
+        gc.fillOval(cx - 5, cy - 5, 10, 10);
         gc.setFill(Draw.CREAM);
-        gc.fillOval(cx + Math.cos(angle) * 22 - 5, cy + Math.sin(angle) * 22 - 5, 10, 10);
+        gc.fillOval(cx + Math.cos(angle) * 20 - 6, cy + Math.sin(angle) * 20 - 6, 12, 12);
 
-        String hint;
-        Color hintColor = Draw.TEXT_DIM;
-        if (game.getPepin().isOut()) {
-            hint = "PÉPIN EST SORTI ! (" + (int) Math.ceil(game.getPepin().getEscapeTimeRemaining()) + " s)";
-            hintColor = Color.web("#ff5260");
+        if (out) {
+            Draw.text(gc, "PÉPIN EST SORTI ! " + (int) Math.ceil(game.getPepin().getEscapeTimeRemaining()) + " s",
+                    ORGAN_X + 20, ORGAN_Y + 100, assets.ui(15), Ui.ALERT, TextAlignment.LEFT);
         } else if (winding) {
-            hint = "Vous remontez l'orgue...";
-            hintColor = Draw.AMBER;
+            Draw.text(gc, "Vous remontez l'orgue...", ORGAN_X + 20, ORGAN_Y + 100, assets.ui(15), Draw.AMBER,
+                    TextAlignment.LEFT);
         } else {
-            hint = "[R] ou clic maintenu : remonter";
+            double kw = Ui.keycap(gc, "R", ORGAN_X + 20, ORGAN_Y + 100, assets.ui(13));
+            Draw.text(gc, "maintenir pour remonter", ORGAN_X + 28 + kw, ORGAN_Y + 100, assets.ui(14), Draw.TEXT_DIM,
+                    TextAlignment.LEFT);
         }
-        Draw.text(gc, hint, ORGAN_X + 20, ORGAN_Y + 100, assets.ui(15), hintColor, TextAlignment.LEFT);
+    }
+
+    /** Chiffre du code du coffre, griffonné en rouge sur le mur d'une des salles. */
+    private void drawClue(GraphicsContext gc, Room room) {
+        int index = Safe.clueIndex(room);
+        if (index < 0 || game.getOffice().getSafe().isOpen()) {
+            return;
+        }
+        double[][] spots = {{250, 250, -8}, {980, 220, 6}, {300, 330, -4}};
+        String text = new String[]{"I", "II", "III"}[index] + " = " + game.getOffice().getSafe().digit(index);
+        gc.save();
+        gc.translate(spots[index][0], spots[index][1]);
+        gc.rotate(spots[index][2]);
+        Draw.text(gc, text, 2, 3, assets.scrawl(34), Color.rgb(0, 0, 0, 0.6), TextAlignment.CENTER);
+        Draw.text(gc, text, 0, 0, assets.scrawl(34), Color.rgb(176, 18, 31, 0.85), TextAlignment.CENTER);
+        gc.restore();
+    }
+
+    /** Coins de viseur de caméra de surveillance. */
+    private void drawViewfinder(GraphicsContext gc) {
+        gc.setStroke(Color.rgb(232, 224, 208, 0.55));
+        gc.setLineWidth(2);
+        double m = 14;
+        double l = 36;
+        double[][] corners = {{m, m, 1, 1}, {W - m, m, -1, 1}, {m, H - m, 1, -1}, {W - m, H - m, -1, -1}};
+        for (double[] c : corners) {
+            gc.strokeLine(c[0], c[1], c[0] + c[2] * l, c[1]);
+            gc.strokeLine(c[0], c[1], c[0], c[1] + c[3] * l);
+        }
+        gc.setStroke(Color.rgb(232, 224, 208, 0.18));
+        gc.setLineWidth(1);
+        gc.strokeLine(W / 2 - 14, H / 2, W / 2 + 14, H / 2);
+        gc.strokeLine(W / 2, H / 2 - 14, W / 2, H / 2 + 14);
     }
 
     private void drawCharacterOnCamera(GraphicsContext gc, Room camera, Room characterRoom,
@@ -1070,42 +1692,64 @@ final class NightScreen implements Screen {
     }
 
     private void drawCameraMap(GraphicsContext gc, CameraSystem cameras) {
-        gc.setFill(Color.rgb(0, 0, 0, 0.65));
-        gc.fillRect(MAP_X, MAP_Y, MAP_W, MAP_H);
-        gc.setStroke(Draw.TEXT_DIM);
-        gc.setLineWidth(1);
-        gc.strokeRect(MAP_X, MAP_Y, MAP_W, MAP_H);
-        gc.setStroke(Color.web("#5a524b"));
-        gc.setLineWidth(3);
-        for (Room room : Room.values()) {
-            double[] a = MAP_POSITIONS.get(room);
-            for (Room next : game.getMap().neighbors(room)) {
-                if (room.ordinal() < next.ordinal()) {
-                    double[] b = MAP_POSITIONS.get(next);
-                    gc.strokeLine(MAP_X + a[0], MAP_Y + a[1], MAP_X + b[0], MAP_Y + b[1]);
+        if (mapBase == null) {
+            // Fond du plan (cadre, titre, contour, couloirs) dessiné une seule fois
+            mapBase = Draw.render(MAP_W, MAP_H, g -> {
+                Ui.panel(g, 0, 0, MAP_W, MAP_H);
+                Draw.text(g, "PLAN DU CHAPITEAU", MAP_W / 2, 17, assets.ui(13), Draw.GOLD, TextAlignment.CENTER);
+                g.setStroke(Color.rgb(201, 162, 74, 0.25));
+                g.setLineWidth(1);
+                g.strokeLine(14, MAP_HEAD + 4, MAP_W - 14, MAP_HEAD + 4);
+                g.setStroke(Color.rgb(255, 255, 255, 0.06));
+                g.setLineWidth(2);
+                g.strokeOval(14, MAP_HEAD + 14, MAP_W - 28, MAP_H - MAP_HEAD - 26);
+                g.setStroke(Color.rgb(201, 162, 74, 0.35));
+                g.setLineWidth(2);
+                for (Room room : Room.values()) {
+                    double[] a = MAP_POSITIONS.get(room);
+                    for (Room next : game.getMap().neighbors(room)) {
+                        if (room.ordinal() < next.ordinal()) {
+                            double[] b = MAP_POSITIONS.get(next);
+                            g.strokeLine(MAP_DX + a[0], MAP_DY + MAP_HEAD + a[1], MAP_DX + b[0], MAP_DY + MAP_HEAD + b[1]);
+                        }
+                    }
                 }
-            }
+            });
         }
+        gc.drawImage(mapBase, MAP_X, MAP_Y);
+        double top = MAP_Y + MAP_HEAD + MAP_DY;
         for (Room room : Room.values()) {
             double[] p = MAP_POSITIONS.get(room);
-            double x = MAP_X + p[0] - CAM_W / 2;
-            double y = MAP_Y + p[1] - CAM_H / 2;
+            double x = MAP_X + MAP_DX + p[0] - CAM_W / 2;
+            double y = top + p[1] - CAM_H / 2;
             boolean selected = room == cameras.getSelected();
-            gc.setFill(room == Room.REGIE ? Color.web("#4a1a1f") : selected ? Draw.AMBER : Color.web("#2a2626"));
-            gc.fillRect(x, y, CAM_W, CAM_H);
-            gc.setStroke(selected ? Draw.CREAM : Draw.TEXT_DIM);
+            boolean hover = room.hasCamera() && Draw.inside(mouseX, mouseY, x, y, CAM_W, CAM_H);
+            if (selected) {
+                gc.setFill(new RadialGradient(0, 0, x + CAM_W / 2, y + CAM_H / 2, 46, false, CycleMethod.NO_CYCLE,
+                        new Stop(0, Color.rgb(255, 176, 0, 0.35)), new Stop(1, Color.TRANSPARENT)));
+                gc.fillOval(x - 14, y - 32, CAM_W + 28, CAM_H + 64);
+            }
+            gc.setFill(room == Room.REGIE ? Color.web("#5a1019") : selected ? Draw.AMBER
+                    : hover ? Color.web("#3a3032") : Color.web("#221b1c"));
+            gc.fillRoundRect(x, y, CAM_W, CAM_H, 8, 8);
+            gc.setStroke(selected ? Draw.CREAM : room == Room.REGIE ? Ui.ALERT : Color.rgb(201, 162, 74, 0.5));
             gc.setLineWidth(selected ? 2 : 1);
-            gc.strokeRect(x, y, CAM_W, CAM_H);
+            gc.strokeRoundRect(x, y, CAM_W, CAM_H, 8, 8);
             String label = room == Room.REGIE ? "VOUS" : room.getCameraLabel();
-            Draw.text(gc, label, x + CAM_W / 2, y + CAM_H / 2, assets.ui(13),
+            Draw.text(gc, label, x + CAM_W / 2, y + CAM_H / 2, assets.ui(12),
                     selected ? Color.BLACK : Draw.TEXT, TextAlignment.CENTER);
+            if (room.hasCamera() && cameras.isDisabled(room)) {
+                gc.setFill(Ui.ALERT);
+                gc.fillOval(x + CAM_W - 8, y - 3, 8, 8);
+            }
         }
     }
 
     private Optional<Room> cameraAt(double x, double y) {
         for (Room room : Room.withCameras()) {
             double[] p = MAP_POSITIONS.get(room);
-            if (Draw.inside(x, y, MAP_X + p[0] - CAM_W / 2, MAP_Y + p[1] - CAM_H / 2, CAM_W, CAM_H)) {
+            if (Draw.inside(x, y, MAP_X + MAP_DX + p[0] - CAM_W / 2, MAP_Y + MAP_HEAD + MAP_DY + p[1] - CAM_H / 2,
+                    CAM_W, CAM_H)) {
                 return Optional.of(room);
             }
         }
@@ -1124,78 +1768,164 @@ final class NightScreen implements Screen {
         gc.fillRect(0, 0, W, H);
     }
 
+    /** Onglet de la tablette, en bas de l'écran, comme une tablette qu'on tire vers soi. */
     private void drawTabletBar(GraphicsContext gc) {
         boolean open = game.getOffice().getCameras().isOpen();
         boolean dark = game.getPower().isPowerOut();
-        gc.setFill(Color.rgb(20, 18, 18, 0.88));
-        gc.fillRect(BAR_X, BAR_Y, BAR_W, BAR_H);
-        gc.setStroke(open ? Draw.AMBER : Draw.TEXT_DIM);
+        boolean hover = Draw.inside(mouseX, mouseY, BAR_X, BAR_Y, BAR_W, BAR_H) && !dark;
+        double inset = 26;
+        double[] xs = {BAR_X, BAR_X + inset, BAR_X + BAR_W - inset, BAR_X + BAR_W};
+        double[] ys = {H + 2, BAR_Y, BAR_Y, H + 2};
+        gc.setFill(hover ? Color.rgb(60, 14, 20, 0.92) : Ui.PANEL);
+        gc.fillPolygon(xs, ys, 4);
+        gc.setStroke(dark ? Ui.ALERT : open || hover ? Draw.AMBER : Ui.EDGE);
         gc.setLineWidth(1.5);
-        gc.strokeRect(BAR_X, BAR_Y, BAR_W, BAR_H);
-        String label = dark ? "PLUS DE COURANT" : open ? "BAISSER LA TABLETTE  [Espace]" : "CAMÉRAS  [Espace]";
-        Draw.text(gc, label, BAR_X + BAR_W / 2, BAR_Y + BAR_H / 2, assets.ui(16),
-                dark ? Color.web("#e0303f") : open ? Draw.AMBER : Draw.TEXT, TextAlignment.CENTER);
+        gc.strokePolyline(xs, ys, 4);
+        double cy = BAR_Y + BAR_H / 2 + 2;
+        if (dark) {
+            Draw.text(gc, "PLUS DE COURANT", W / 2, cy, assets.ui(16), Ui.ALERT, TextAlignment.CENTER);
+            return;
+        }
+        if (!open && game.getOffice().getFuseBox().isTripped(FuseBox.Circuit.CAMERAS)) {
+            Draw.text(gc, "CAMÉRAS HORS SERVICE (FUSIBLE)", W / 2, cy, assets.ui(15), Ui.ALERT, TextAlignment.CENTER);
+            return;
+        }
+        if (!open && game.getOffice().isHidden()) {
+            Draw.text(gc, "SORTEZ DE LA CACHETTE (S)", W / 2, cy, assets.ui(15), Draw.TEXT_DIM, TextAlignment.CENTER);
+            return;
+        }
+        // Chevron : vers le haut pour lever, vers le bas pour baisser
+        double chx = BAR_X + 60;
+        int dir = open ? 1 : -1;
+        gc.setStroke(open ? Draw.AMBER : Draw.CREAM);
+        gc.setLineWidth(2.5);
+        gc.strokeLine(chx - 9, cy - dir * 5, chx, cy + dir * 4);
+        gc.strokeLine(chx, cy + dir * 4, chx + 9, cy - dir * 5);
+        gc.strokeLine(BAR_X + BAR_W - 69, cy - dir * 5, BAR_X + BAR_W - 60, cy + dir * 4);
+        gc.strokeLine(BAR_X + BAR_W - 60, cy + dir * 4, BAR_X + BAR_W - 51, cy - dir * 5);
+        String label = open ? "BAISSER" : "CAMÉRAS";
+        double lw = Ui.width(label, assets.ui(17));
+        double kw = Ui.width("Espace", assets.ui(12)) + 12;
+        double start = W / 2 - (lw + 10 + kw) / 2;
+        Draw.text(gc, label, start, cy, assets.ui(17), open ? Draw.AMBER : Draw.CREAM, TextAlignment.LEFT);
+        Ui.keycap(gc, "Espace", start + lw + 10, cy, assets.ui(12));
     }
 
     private void drawHud(GraphicsContext gc) {
-        // Heure et nuit
-        Draw.shadowText(gc, game.getClock().getFormattedTime(), W - 40, 52, assets.title(48), Draw.CREAM,
-                TextAlignment.RIGHT);
-        String nightLabel = game.isCustomNight() ? "NUIT PERSONNALISÉE" : "NUIT " + game.getCurrentNight();
-        Draw.shadowText(gc, nightLabel, W - 42, 96, assets.ui(20), Draw.TEXT, TextAlignment.RIGHT);
-
-        // Énergie : pourcentage et batterie à 10 cases
-        double energy = game.getPower().getEnergy();
-        Color level = energy > 50 ? Color.web("#7fbf6a") : energy > 25 ? Draw.AMBER : Color.web("#e0303f");
-        Draw.shadowText(gc, "ÉNERGIE", 40, 612, assets.ui(15), Draw.TEXT_DIM, TextAlignment.LEFT);
-        Draw.shadowText(gc, (int) Math.ceil(energy) + " %", 40, 646, assets.title(34), level, TextAlignment.LEFT);
-        int cells = (int) Math.ceil(energy / 10);
-        for (int i = 0; i < 10; i++) {
-            gc.setFill(i < cells ? level : Color.rgb(255, 255, 255, 0.08));
-            gc.fillRect(40 + i * 20, 676, 16, 14);
-        }
-        Draw.text(gc, "USAGE", 260, 683, assets.ui(13), Draw.TEXT_DIM, TextAlignment.LEFT);
-        int usage = game.getPower().isPowerOut() ? 0 : game.getPower().computeUsage();
-        for (int i = 0; i < 6; i++) {
-            gc.setFill(i < usage ? (i == 0 ? Color.web("#7fbf6a") : i < 3 ? Draw.AMBER : Color.web("#e0303f"))
-                    : Color.rgb(255, 255, 255, 0.08));
-            gc.fillRect(318 + i * 14, 676, 10, 14);
-        }
-
+        drawClock(gc);
+        drawPower(gc);
         if (timeScale > 1) {
-            Draw.text(gc, "TEMPS x" + (int) timeScale + "  (F2)", 40, 132, assets.ui(16), Draw.AMBER, TextAlignment.LEFT);
+            Ui.panel(gc, W - 246, 106, 222, 30, Draw.AMBER);
+            Draw.text(gc, "TEMPS x" + (int) timeScale + "  (F2)", W - 135, 121, assets.ui(14), Draw.AMBER,
+                    TextAlignment.CENTER);
         }
 
-        // Alerte de l'orgue, visible depuis la régie comme depuis les autres caméras
+        // Alertes en haut de l'écran, visibles depuis la régie comme depuis les caméras
+        double alertY = 76;
+        if (game.getMimi().isAtEmbrasure()) {
+            int seconds = (int) Math.ceil(game.getMimi().getEmbrasureTimeRemaining());
+            Ui.alert(gc, "MIMI BLOQUE LA PORTE - REGARDEZ LA CAM 7 (" + seconds + " s)", W / 2, alertY,
+                    assets.ui(15), time);
+            alertY += 44;
+        }
         BarrelOrgan organ = game.getOffice().getOrgan();
         boolean onOrganCamera = game.getOffice().getCameras().isWatching(Room.FOSSE_ORCHESTRE);
         if (!game.getPower().isPowerOut() && !onOrganCamera && organ.getCharge() < ORGAN_WARNING
-                && ((int) (time * 3)) % 2 == 0) {
-            String text = game.getPepin().isOut() ? "! PÉPIN EST SORTI - CAM 8 !"
-                    : "! ORGUE " + (int) Math.ceil(organ.getCharge()) + " % - CAM 8";
-            Draw.shadowText(gc, text, W - 40, 134, assets.ui(18),
-                    game.getPepin().isOut() ? Color.web("#ff5260") : Draw.AMBER, TextAlignment.RIGHT);
+                && !game.getOffice().isHidden()) {
+            String text = game.getPepin().isOut() ? "PÉPIN EST SORTI - CAM 8 POUR L'ORGUE, OU CACHEZ-VOUS (S)"
+                    : "L'ORGUE FAIBLIT (" + (int) Math.ceil(organ.getCharge()) + " %) - REMONTEZ-LE SUR LA CAM 8";
+            Ui.alert(gc, text, W / 2, alertY, assets.ui(15), time);
+            alertY += 44;
+        }
+        if (game.getOffice().getFuseBox().getTripped() != null && !game.getPower().isPowerOut()) {
+            Ui.alert(gc, "UN FUSIBLE A SAUTÉ - MAINTENEZ F (OU LE LEVIER) SUR LE DISJONCTEUR", W / 2, alertY,
+                    assets.ui(15), time);
+        }
+        drawNoise(gc);
+        if (!game.getOffice().getCameras().isOpen() && !game.getPower().isPowerOut() && !isFrozen()) {
+            boolean hidden = game.getOffice().isHidden();
+            boolean hover = Draw.inside(mouseX, mouseY, HIDE_X, HIDE_Y, HIDE_W, HIDE_H);
+            Ui.panel(gc, HIDE_X, HIDE_Y, HIDE_W, HIDE_H, hover ? Draw.GOLD : Ui.EDGE);
+            double kw = Ui.keycap(gc, "S", HIDE_X + 14, HIDE_Y + HIDE_H / 2, assets.ui(12));
+            Draw.text(gc, hidden ? "SORTIR" : "SE CACHER", HIDE_X + 24 + kw, HIDE_Y + HIDE_H / 2, assets.ui(14),
+                    hover ? Draw.CREAM : Draw.TEXT, TextAlignment.LEFT);
         }
 
         if (subtitleTimer > 0 && subtitle != null) {
             gc.setGlobalAlpha(Math.min(1.0, subtitleTimer));
-            gc.setFill(Color.rgb(0, 0, 0, 0.6));
-            gc.fillRect(W / 2 - 330, 606, 660, 36);
-            Draw.text(gc, subtitle, W / 2, 624, assets.ui(19), Draw.CREAM, TextAlignment.CENTER);
+            double w = Ui.width(subtitle, assets.ui(17)) + 50;
+            gc.setFill(Color.rgb(0, 0, 0, 0.7));
+            gc.fillRoundRect(W / 2 - w / 2, 622, w, 34, 17, 17);
+            Draw.text(gc, subtitle, W / 2, 639, assets.ui(17), Draw.CREAM, TextAlignment.CENTER);
             gc.setGlobalAlpha(1.0);
         }
-        if (game.getMimi().isAtEmbrasure()) {
-            int seconds = (int) Math.ceil(game.getMimi().getEmbrasureTimeRemaining());
-            Draw.text(gc, "MIMI BLOQUE LA PORTE - REGARDEZ CAM 7 (" + seconds + " s)",
-                    W / 2, 570, assets.ui(18), Color.web("#ff5260"), TextAlignment.CENTER);
+    }
+
+    /** Bruit fait dans la régie : plus il est haut, plus les clowns vous entendent. */
+    private void drawNoise(GraphicsContext gc) {
+        double level = game.getOffice().getNoise().getLevel() / NoiseMeter.MAX;
+        double x = 24;
+        double y = H - 150;
+        Draw.text(gc, "BRUIT", x + 18, y, assets.ui(12), Draw.TEXT_DIM, TextAlignment.LEFT);
+        Ui.gauge(gc, x + 70, y - 5, 230, 10, 12, level,
+                game.getOffice().getNoise().isLoud() ? Ui.ALERT : level > 0.25 ? Draw.AMBER : Draw.TEXT_DIM);
+    }
+
+    /** Heure, nuit et avancée de la nuit, en haut à droite. */
+    private void drawClock(GraphicsContext gc) {
+        double x = W - 246;
+        double y = 16;
+        Ui.panel(gc, x, y, 222, 82);
+        Draw.shadowText(gc, game.getClock().getFormattedTime(), x + 206, y + 34, assets.title(38), Draw.CREAM,
+                TextAlignment.RIGHT);
+        String night = game.isCustomNight() ? "NUIT PERSO" : "NUIT " + game.getCurrentNight();
+        Draw.text(gc, night, x + 18, y + 26, assets.ui(14), Draw.GOLD, TextAlignment.LEFT);
+        Draw.text(gc, "jusqu'à 6 h", x + 18, y + 44, assets.ui(11), Draw.TEXT_DIM, TextAlignment.LEFT);
+        int hour = game.getClock().getHour();
+        for (int i = 0; i < 6; i++) {
+            double px = x + 24 + i * 35;
+            Ui.diamond(gc, px, y + 66, i < hour ? 5 : 3, i < hour ? Draw.GOLD : Color.rgb(255, 255, 255, 0.18));
+            if (i < 5) {
+                gc.setStroke(Color.rgb(255, 255, 255, i < hour - 1 ? 0.35 : 0.08));
+                gc.setLineWidth(1);
+                gc.strokeLine(px + 7, y + 66, px + 28, y + 66);
+            }
         }
+    }
+
+    /** Énergie restante et consommation, en bas à gauche. */
+    private void drawPower(GraphicsContext gc) {
+        double x = 24;
+        double y = H - 118;
+        boolean dark = game.getPower().isPowerOut();
+        double energy = game.getPower().getEnergy();
+        double ratio = energy / 100.0;
+        Color level = Ui.levelColor(ratio);
+        Ui.panel(gc, x, y, 300, 102, dark ? Ui.ALERT : Ui.EDGE);
+        Draw.text(gc, "ÉNERGIE", x + 18, y + 20, assets.ui(12), Draw.TEXT_DIM, TextAlignment.LEFT);
+        Draw.text(gc, "CONSOMMATION", x + 282, y + 20, assets.ui(12), Draw.TEXT_DIM, TextAlignment.RIGHT);
+        boolean lowBlink = energy < 15 && !dark && ((int) (time * 3)) % 2 == 0;
+        Ui.battery(gc, x + 18, y + 36, 52, 26, ratio, lowBlink ? Color.TRANSPARENT : level);
+        Draw.shadowText(gc, (int) Math.ceil(energy) + " %", x + 86, y + 50, assets.title(30), level, TextAlignment.LEFT);
+        int usage = dark ? 0 : game.getPower().computeUsage();
+        Ui.gauge(gc, x + 186, y + 42, 96, 14, 6, usage / 6.0, usage <= 1 ? Ui.OK : usage <= 3 ? Draw.AMBER : Ui.ALERT);
+        Ui.gauge(gc, x + 18, y + 78, 264, 8, 20, ratio, level);
     }
 
     private void drawTitleCard(GraphicsContext gc) {
         double alpha = cassetteActive ? 1.0 : Math.min(1.0, titleCard / 1.0);
         gc.setGlobalAlpha(alpha);
         Draw.clear(gc, Color.BLACK);
+        gc.setFill(new RadialGradient(0, 0, W / 2, H / 2 - 20, 420, false, CycleMethod.NO_CYCLE,
+                new Stop(0, Color.rgb(110, 14, 26, 0.35)), new Stop(1, Color.TRANSPARENT)));
+        gc.fillRect(0, 0, W, H);
         int night = game.getCurrentNight();
+        gc.setStroke(Color.rgb(201, 162, 74, 0.6));
+        gc.setLineWidth(1);
+        gc.strokeLine(W / 2 - 160, H / 2 - 110, W / 2 - 60, H / 2 - 110);
+        gc.strokeLine(W / 2 + 60, H / 2 - 110, W / 2 + 160, H / 2 - 110);
+        Ui.diamond(gc, W / 2 - 166, H / 2 - 110, 4, Draw.GOLD);
+        Ui.diamond(gc, W / 2 + 166, H / 2 - 110, 4, Draw.GOLD);
         Draw.text(gc, "00:00", W / 2, H / 2 - 110, assets.ui(26), Draw.TEXT_DIM, TextAlignment.CENTER);
         if (game.isCustomNight()) {
             Draw.text(gc, "NUIT PERSONNALISÉE", W / 2, H / 2 - 30, assets.title(64), Draw.RED, TextAlignment.CENTER);
@@ -1206,61 +1936,189 @@ final class NightScreen implements Screen {
             Draw.text(gc, NIGHT_LINES[Math.min(night, NIGHT_LINES.length) - 1], W / 2, H / 2 + 60,
                     assets.ui(20), Draw.TEXT, TextAlignment.CENTER);
         }
-        Draw.text(gc, "[Entrée] Passer", W / 2, H - 50, assets.ui(15), Draw.TEXT_DIM, TextAlignment.CENTER);
+        Ui.hints(gc, W / 2, H - 50, TextAlignment.CENTER, assets.ui(14), "Entrée", "Passer");
         gc.setGlobalAlpha(1.0);
     }
 
-    /** La cassette du veilleur : texte tapé à la machine sur fond de bande qui tourne. */
+    /**
+     * La cassette du veilleur : un vieux magnétophone posé sur le bureau, dans
+     * le noir, qui déroule la voix de Marcel en sous-titres. Au milieu, la bande
+     * se dérègle et murmure autre chose.
+     */
     private void drawCassette(GraphicsContext gc) {
-        Draw.clear(gc, Color.web("#070505"));
-        // Cassette dessinée
-        double cx = W / 2;
-        double cy = 150;
-        gc.setFill(Color.web("#1c1816"));
-        gc.fillRoundRect(cx - 170, cy - 70, 340, 140, 14, 14);
-        gc.setFill(Color.web("#d8cfb8"));
-        gc.fillRect(cx - 140, cy - 56, 280, 44);
-        Draw.text(gc, "VEILLE - NUIT " + game.getCurrentNight() + " - MARCEL", cx, cy - 34, assets.ui(15),
-                Color.web("#2a2420"), TextAlignment.CENTER);
-        gc.setFill(Color.web("#0d0b0a"));
-        gc.fillRoundRect(cx - 110, cy + 2, 220, 48, 24, 24);
-        for (double rx : new double[]{cx - 70, cx + 70}) {
-            gc.setFill(Color.web("#3a3430"));
-            gc.fillOval(rx - 20, cy + 6, 40, 40);
-            gc.setStroke(Color.web("#d8cfb8"));
-            gc.setLineWidth(3);
-            double a = time * 4;
-            for (int k = 0; k < 3; k++) {
-                double ang = a + k * Math.PI * 2 / 3;
-                gc.strokeLine(rx, cy + 26, rx + Math.cos(ang) * 14, cy + 26 + Math.sin(ang) * 14);
-            }
+        if (cassetteBackground == null) {
+            cassetteBackground = Draw.render(W, H, this::paintCassetteBackground);
         }
-        if (((int) (time * 1.5)) % 2 == 0) {
-            gc.setFill(Draw.RED);
-            gc.fillOval(cx - 262, cy - 6, 12, 12);
-        }
-        Draw.text(gc, "LECTURE", cx - 244, cy, assets.ui(13), Draw.TEXT_DIM, TextAlignment.LEFT);
+        boolean glitch = glitchTimer > 0;
+        double shake = glitch ? Draw.random(-6, 6) : 0;
+        gc.drawImage(cassetteBackground, Math.round(shake), 0);
 
-        // Texte tapé à la machine
+        int total = Math.max(1, cassetteLength());
+        double progress = Math.min(1.0, typedChars / (double) total);
+        drawTapeDeck(gc, W / 2 + shake, 70, progress, glitch);
+
+        // Sous-titres : les dernières lignes, les plus anciennes s'effacent
+        List<String> shownLines = new ArrayList<>();
         int remaining = typedChars;
-        double y = 300;
         for (String line : cassetteLines) {
             if (remaining <= 0) {
                 break;
             }
-            String shown = line.substring(0, Math.min(line.length(), remaining));
-            Draw.text(gc, shown, 190, y, assets.ui(22), Draw.CREAM, TextAlignment.LEFT);
+            shownLines.add(line.substring(0, Math.min(line.length(), remaining)));
             remaining -= line.length() + 1;
-            y += 36;
         }
-        if (((int) (time * 2)) % 2 == 0 && typedChars < cassetteLength()) {
-            gc.setFill(Draw.CREAM);
-            gc.fillRect(190, y - 36 + 12, 12, 3);
+        int first = Math.max(0, shownLines.size() - 4);
+        double y = 470;
+        Ui.smear(gc, W / 2, 520, 1180, 230, 0.9);
+        Draw.text(gc, "MARCEL, LE VEILLEUR D'AVANT", W / 2, 432, assets.serif(17), Draw.GOLD, TextAlignment.CENTER);
+        for (int i = first; i < shownLines.size(); i++) {
+            double age = shownLines.size() - 1 - i;
+            Color color = Color.rgb(230, 220, 196, Math.max(0.35, 1.0 - age * 0.22));
+            Draw.shadowText(gc, shownLines.get(i), W / 2, y, assets.ui(22), color, TextAlignment.CENTER);
+            y += 34;
         }
-        Draw.text(gc, typedChars < cassetteLength() ? "[Entrée] Tout afficher" : "[Entrée] Commencer la nuit",
-                W / 2, H - 50, assets.ui(15), Draw.TEXT_DIM, TextAlignment.CENTER);
+
+        if (glitch) {
+            // La bande murmure autre chose
+            String whisper = TAPE_WHISPERS[Math.min(game.getCurrentNight(), TAPE_WHISPERS.length) - 1];
+            gc.setFill(Color.rgb(120, 0, 10, 0.25 + Math.random() * 0.2));
+            gc.fillRect(0, 0, W, H);
+            Ui.vhsTracking(gc, time * 6);
+            Draw.grain(gc, 1800, 0.45);
+            gc.save();
+            gc.translate(W / 2 + Draw.random(-8, 8), 330 + Draw.random(-4, 4));
+            gc.rotate(Draw.random(-3, 3));
+            Ui.ghostText(gc, whisper, 0, 0, assets.scrawl(46), Color.rgb(220, 20, 34), TextAlignment.CENTER, 6);
+            gc.restore();
+        } else {
+            Ui.vhsTracking(gc, time);
+        }
+
+        String action = typedChars < cassetteLength() ? "Tout afficher" : "Commencer la nuit";
+        Ui.hints(gc, W / 2, H - 34, TextAlignment.CENTER, assets.ui(14), "Entrée", action);
         Draw.grain(gc, 500, 0.15);
-        Draw.overlay(gc, 0, 0.2, 0.9);
+        Ui.filmDamage(gc);
+        Draw.overlay(gc, 0, 0.2, 0.95);
+    }
+
+    /** Fond de la cassette : le couloir flou et sombre, et le bureau sous la lampe. */
+    private void paintCassetteBackground(GraphicsContext g) {
+        Draw.clear(g, Color.BLACK);
+        g.setEffect(new javafx.scene.effect.GaussianBlur(24));
+        Draw.cover(g, assets.camera(Room.COULOIR_GAUCHE), 0, 0, W, H, 1.1);
+        g.setEffect(null);
+        g.setFill(Color.rgb(8, 2, 3, 0.8));
+        g.fillRect(0, 0, W, H);
+        // Plateau du bureau
+        g.setFill(new LinearGradient(0, 380, 0, H, false, CycleMethod.NO_CYCLE,
+                new Stop(0, Color.web("#2e1d14")), new Stop(1, Color.web("#0c0705"))));
+        g.fillPolygon(new double[]{150, W - 150, W + 60, -60}, new double[]{380, 380, H, H}, 4);
+        g.setFill(Color.rgb(255, 220, 170, 0.12));
+        g.fillRect(150, 378, W - 300, 3);
+        // Lumière de la lampe qui tombe sur le magnétophone
+        g.setFill(new RadialGradient(0, 0, W / 2, 240, 460, false, CycleMethod.NO_CYCLE,
+                new Stop(0, Color.rgb(255, 170, 100, 0.20)), new Stop(1, Color.TRANSPARENT)));
+        g.fillRect(0, 0, W, H);
+    }
+
+    /** Magnétophone à bobines : bandes qui défilent, vumètre, compteur et touches. */
+    private void drawTapeDeck(GraphicsContext gc, double cx, double top, double progress, boolean glitch) {
+        double w = 600;
+        double h = 290;
+        double x = cx - w / 2;
+        gc.setFill(Color.rgb(0, 0, 0, 0.6));
+        gc.fillRoundRect(x + 10, top + 16, w, h, 18, 18);
+        gc.setFill(new LinearGradient(0, top, 0, top + h, false, CycleMethod.NO_CYCLE,
+                new Stop(0, Color.web("#2c2724")), new Stop(1, Color.web("#151210"))));
+        gc.fillRoundRect(x, top, w, h, 18, 18);
+        gc.setStroke(Color.rgb(176, 141, 69, 0.45));
+        gc.setLineWidth(1.5);
+        gc.strokeRoundRect(x + 1, top + 1, w - 2, h - 2, 18, 18);
+        Draw.text(gc, "MALVAUX  AUDIO  -  R7", x + 24, top + 22, assets.serif(14), Draw.GOLD, TextAlignment.LEFT);
+
+        // Les deux bobines : la bande passe de gauche à droite
+        double reelY = top + 112;
+        double[] reelX = {cx - 150, cx + 150};
+        double[] tape = {62 - 32 * progress, 30 + 32 * progress};
+        gc.setStroke(Color.web("#3a2a1e"));
+        gc.setLineWidth(2);
+        gc.strokeLine(reelX[0], reelY + tape[0], cx - 40, top + 186);
+        gc.strokeLine(cx - 40, top + 186, cx + 40, top + 186);
+        gc.strokeLine(cx + 40, top + 186, reelX[1], reelY + tape[1]);
+        for (int i = 0; i < 2; i++) {
+            gc.setFill(Color.web("#0d0b0a"));
+            gc.fillOval(reelX[i] - 76, reelY - 76, 152, 152);
+            gc.setFill(Color.web("#3a2a1e"));
+            gc.fillOval(reelX[i] - tape[i], reelY - tape[i], tape[i] * 2, tape[i] * 2);
+            gc.setStroke(Color.rgb(200, 190, 170, 0.35));
+            gc.setLineWidth(1.5);
+            gc.strokeOval(reelX[i] - 74, reelY - 74, 148, 148);
+            gc.setStroke(Draw.CREAM);
+            gc.setLineWidth(4);
+            for (int k = 0; k < 3; k++) {
+                double a = reelAngle + k * Math.PI * 2 / 3;
+                gc.strokeLine(reelX[i] + Math.cos(a) * 9, reelY + Math.sin(a) * 9,
+                        reelX[i] + Math.cos(a) * 26, reelY + Math.sin(a) * 26);
+            }
+            gc.setFill(Color.web("#8a7d70"));
+            gc.fillOval(reelX[i] - 8, reelY - 8, 16, 16);
+        }
+
+        // Étiquette griffonnée
+        gc.setFill(Color.web("#d8cfb8"));
+        gc.fillRect(cx - 76, top + 50, 152, 40);
+        Draw.text(gc, "Nuit " + game.getCurrentNight() + " - Marcel", cx, top + 70, assets.scrawl(14),
+                Color.web("#2a1810"), TextAlignment.CENTER);
+
+        // Vumètre
+        double vx = x + 28;
+        double vy = top + 214;
+        gc.setFill(Color.web("#d9cba0"));
+        gc.fillRect(vx, vy, 120, 56);
+        gc.setStroke(Color.web("#3a2a1e"));
+        gc.setLineWidth(1);
+        for (int k = 0; k <= 8; k++) {
+            double a = Math.toRadians(-140 + k * 12.5);
+            gc.strokeLine(vx + 60 + Math.cos(a) * 40, vy + 54 + Math.sin(a) * 40,
+                    vx + 60 + Math.cos(a) * 46, vy + 54 + Math.sin(a) * 46);
+        }
+        double level = glitch ? 0.95 + Draw.random(-0.05, 0.05)
+                : typedChars < cassetteLength() ? 0.35 + 0.35 * Math.abs(Math.sin(time * 11)) * Math.random()
+                : 0.05;
+        double needle = Math.toRadians(-140 + level * 100);
+        gc.setStroke(level > 0.85 ? Draw.RED : Color.web("#1a1410"));
+        gc.setLineWidth(2);
+        gc.strokeLine(vx + 60, vy + 54, vx + 60 + Math.cos(needle) * 44, vy + 54 + Math.sin(needle) * 44);
+        Draw.text(gc, "VU", vx + 108, vy + 46, assets.ui(10), Color.web("#3a2a1e"), TextAlignment.CENTER);
+
+        // Compteur mécanique
+        String counter = String.format("%03d", typedChars / 3);
+        for (int k = 0; k < 3; k++) {
+            gc.setFill(Color.web("#0b0a09"));
+            gc.fillRect(cx - 45 + k * 30, top + 222, 26, 36);
+            Draw.text(gc, counter.substring(k, k + 1), cx - 32 + k * 30, top + 240, assets.ui(22), Draw.CREAM,
+                    TextAlignment.CENTER);
+        }
+
+        // Touches : lecture enfoncée, voyant rouge
+        String[] keys = {"<<", ">", "[]", ">>"};
+        for (int k = 0; k < keys.length; k++) {
+            double bx = x + w - 230 + k * 50;
+            boolean pressed = k == 1;
+            gc.setFill(pressed ? Color.web("#6a1018") : Color.web("#4a433d"));
+            gc.fillRect(bx, top + (pressed ? 226 : 220), 42, 32);
+            if (pressed) {
+                gc.setStroke(Color.rgb(255, 80, 90, 0.6));
+                gc.setLineWidth(1);
+                gc.strokeRect(bx + 0.5, top + 226.5, 41, 31);
+            }
+            Draw.text(gc, keys[k], bx + 21, top + (pressed ? 242 : 236), assets.ui(13), Draw.CREAM, TextAlignment.CENTER);
+        }
+        boolean led = glitch ? Math.random() < 0.5 : ((int) (time * 1.5)) % 2 == 0;
+        gc.setFill(led ? Color.web("#ff2a3a") : Color.web("#4a0a10"));
+        gc.fillOval(x + w - 34, top + 14, 12, 12);
+        Draw.text(gc, glitch ? "ERREUR" : "LECTURE", x + w - 42, top + 21, assets.ui(11),
+                glitch ? Ui.ALERT : Draw.TEXT_DIM, TextAlignment.RIGHT);
     }
 
     /** Faux plantage du jeu après avoir trop regardé le Bobo doré. */
@@ -1290,35 +2148,32 @@ final class NightScreen implements Screen {
     }
 
     private void drawPauseButton(GraphicsContext gc) {
-        gc.setFill(Color.rgb(20, 18, 18, 0.88));
-        gc.fillRoundRect(PAUSE_X, PAUSE_Y, PAUSE_W, PAUSE_H, 8, 8);
-        gc.setStroke(Draw.TEXT_DIM);
-        gc.setLineWidth(1.5);
-        gc.strokeRoundRect(PAUSE_X, PAUSE_Y, PAUSE_W, PAUSE_H, 8, 8);
-        Draw.text(gc, "PAUSE  [P]", PAUSE_X + PAUSE_W / 2, PAUSE_Y + PAUSE_H / 2,
-                assets.ui(14), Draw.CREAM, TextAlignment.CENTER);
+        boolean hover = Draw.inside(mouseX, mouseY, PAUSE_X, PAUSE_Y, PAUSE_W, PAUSE_H);
+        Ui.panel(gc, PAUSE_X, PAUSE_Y, PAUSE_W, PAUSE_H, hover ? Draw.GOLD : Ui.EDGE);
+        double cy = PAUSE_Y + PAUSE_H / 2;
+        double kw = Ui.keycap(gc, "P", PAUSE_X + 20, cy, assets.ui(12));
+        gc.setFill(hover ? Draw.CREAM : Draw.TEXT);
+        gc.fillRect(PAUSE_X + 34 + kw, cy - 7, 4, 14);
+        gc.fillRect(PAUSE_X + 42 + kw, cy - 7, 4, 14);
+        Draw.text(gc, "PAUSE", PAUSE_X + 56 + kw, cy, assets.ui(14), hover ? Draw.CREAM : Draw.TEXT, TextAlignment.LEFT);
     }
 
     private void drawPauseOverlay(GraphicsContext gc) {
         gc.setFill(Color.rgb(0, 0, 0, 0.72));
         gc.fillRect(0, 0, W, H);
-        gc.setFill(Color.web("#1a1012"));
-        gc.fillRoundRect(PAUSE_PANEL_X, PAUSE_PANEL_Y, PAUSE_PANEL_W, PAUSE_PANEL_H, 16, 16);
-        gc.setStroke(Draw.GOLD);
-        gc.setLineWidth(2);
-        gc.strokeRoundRect(PAUSE_PANEL_X, PAUSE_PANEL_Y, PAUSE_PANEL_W, PAUSE_PANEL_H, 16, 16);
-        Draw.text(gc, "PAUSE", W / 2, PAUSE_PANEL_Y + 65, assets.title(48), Draw.CREAM, TextAlignment.CENTER);
-        drawPauseAction(gc, RESUME_Y, "REPRENDRE  [P / ÉCHAP]");
+        Ui.window(gc, PAUSE_PANEL_X, PAUSE_PANEL_Y, PAUSE_PANEL_W, PAUSE_PANEL_H, "PAUSE", assets.title(40));
+        Draw.text(gc, (game.isCustomNight() ? "Nuit personnalisée" : "Nuit " + game.getCurrentNight()) + "  -  "
+                + game.getClock().getFormattedTime(), W / 2, PAUSE_PANEL_Y + 92, assets.ui(15), Draw.TEXT_DIM,
+                TextAlignment.CENTER);
+        drawPauseAction(gc, RESUME_Y, "REPRENDRE");
         drawPauseAction(gc, MENU_Y, "RETOUR AU MENU");
+        Ui.hints(gc, W / 2, PAUSE_PANEL_Y + PAUSE_PANEL_H - 34, TextAlignment.CENTER, assets.ui(13),
+                "P / Échap", "Reprendre");
     }
 
     private void drawPauseAction(GraphicsContext gc, double y, String label) {
-        gc.setFill(Color.web("#2a2426"));
-        gc.fillRoundRect(RESUME_X, y, PAUSE_ACTION_W, PAUSE_ACTION_H, 8, 8);
-        gc.setStroke(Draw.TEXT_DIM);
-        gc.setLineWidth(1.5);
-        gc.strokeRoundRect(RESUME_X, y, PAUSE_ACTION_W, PAUSE_ACTION_H, 8, 8);
-        Draw.text(gc, label, W / 2, y + PAUSE_ACTION_H / 2, assets.ui(17), Draw.CREAM, TextAlignment.CENTER);
+        boolean hover = Draw.inside(mouseX, mouseY, RESUME_X, y, PAUSE_ACTION_W, PAUSE_ACTION_H);
+        Ui.button(gc, RESUME_X, y, PAUSE_ACTION_W, PAUSE_ACTION_H, label, assets.ui(18), hover);
     }
 
     /**

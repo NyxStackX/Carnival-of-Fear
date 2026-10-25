@@ -33,13 +33,13 @@ final class Draw {
     static final double W = GameApp.WIDTH;
     static final double H = GameApp.HEIGHT;
 
-    static final Color RED = Color.web("#b3202f");
+    static final Color RED = Color.web("#b01827");
     static final Color RED_DARK = Color.web("#5a1019");
-    static final Color CREAM = Color.web("#e8e0d0");
+    static final Color CREAM = Color.web("#e6dcc4");
     static final Color TEXT = Color.web("#d8cfc0");
     static final Color TEXT_DIM = Color.web("#8a8178");
     static final Color AMBER = Color.web("#ffb000");
-    static final Color GOLD = Color.web("#c9a24a");
+    static final Color GOLD = Color.web("#b08d45");
 
     private static final Random RANDOM = new Random();
     private static final Map<String, Image> OVERLAYS = new HashMap<>();

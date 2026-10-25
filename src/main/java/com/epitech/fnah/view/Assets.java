@@ -29,6 +29,8 @@ public final class Assets {
     private final Map<String, Image> scaledSprites = new HashMap<>();
     private String titleFamily = "Serif";
     private String uiFamily = "Monospaced";
+    private String serifFamily = "Serif";
+    private String scrawlFamily = "Serif";
 
     private Assets() {
     }
@@ -40,8 +42,10 @@ public final class Assets {
      */
     public static Assets load() {
         Assets assets = new Assets();
-        assets.titleFamily = loadFont("/fonts/Rye-Regular.ttf", assets.titleFamily);
+        assets.titleFamily = loadFont("/fonts/Eater-Regular.ttf", assets.titleFamily);
         assets.uiFamily = loadFont("/fonts/SpecialElite-Regular.ttf", assets.uiFamily);
+        assets.serifFamily = loadFont("/fonts/IMFellEnglishSC-Regular.ttf", assets.serifFamily);
+        assets.scrawlFamily = loadFont("/fonts/RockSalt-Regular.ttf", assets.scrawlFamily);
         for (Room room : Room.withCameras()) {
             Image image = loadImage("/images/cameras/" + room.name().toLowerCase(Locale.ROOT) + ".jpg");
             if (image != null) {
@@ -67,13 +71,33 @@ public final class Assets {
     }
 
     /**
-     * Police des titres (style affiche de cirque).
+     * Police des titres (lettres d'horreur épineuses).
      *
      * @param size taille en points
      * @return la police
      */
     public Font title(double size) {
         return Font.font(titleFamily, size);
+    }
+
+    /**
+     * Police gravée à l'ancienne (menus, étiquettes).
+     *
+     * @param size taille en points
+     * @return la police
+     */
+    public Font serif(double size) {
+        return Font.font(serifFamily, size);
+    }
+
+    /**
+     * Écriture griffonnée à la main (inscriptions sur les murs, hallucinations).
+     *
+     * @param size taille en points
+     * @return la police
+     */
+    public Font scrawl(double size) {
+        return Font.font(scrawlFamily, size);
     }
 
     /**

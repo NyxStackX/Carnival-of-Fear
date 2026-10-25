@@ -60,7 +60,7 @@ public class GameApp extends Application {
         game.getEvents().subscribe(GameEvent.AchievementUnlocked.class, e -> saveProgress());
 
         Assets assets = Assets.load();
-        SoundManager sound = new SoundManager(game);
+        SoundManager sound = new SoundManager(game, config);
         ScreenManager screens = new ScreenManager(game, assets, sound, config);
 
         Canvas canvas = new Canvas(WIDTH, HEIGHT);

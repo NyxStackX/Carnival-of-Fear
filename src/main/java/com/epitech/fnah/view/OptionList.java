@@ -3,6 +3,9 @@ package com.epitech.fnah.view;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.input.KeyCode;
 import javafx.scene.paint.Color;
+import javafx.scene.paint.CycleMethod;
+import javafx.scene.paint.LinearGradient;
+import javafx.scene.paint.Stop;
 import javafx.scene.text.Font;
 import javafx.scene.text.TextAlignment;
 
@@ -102,21 +105,60 @@ final class OptionList {
         }
     }
 
+    /**
+     * Dessine les options. Une option réglable peut séparer son nom et sa valeur
+     * par {@code |} (ex. {@code "NUIT|3"}) : la valeur s'affiche à droite, entre
+     * deux flèches.
+     */
     void render(GraphicsContext gc, Font font, Font selectedFont) {
+        double left = x - 24;
         for (int i = 0; i < options.size(); i++) {
             double cy = y + i * spacing;
-            String label = options.get(i).label().get();
-            if (i == selected) {
+            Option option = options.get(i);
+            String label = option.label().get();
+            String value = null;
+            int bar = label.indexOf('|');
+            if (bar >= 0) {
+                value = label.substring(bar + 1);
+                label = label.substring(0, bar);
+            }
+            boolean active = i == selected;
+            double h = spacing * 0.8;
+            if (active) {
                 double glow = 0.5 + 0.5 * Math.sin(pulse * 4);
-                gc.setFill(Color.rgb(179, 32, 47, 0.18 + 0.12 * glow));
-                gc.fillRect(x - 24, cy - spacing * 0.42, width, spacing * 0.84);
-                gc.setFill(Draw.RED);
-                gc.fillPolygon(new double[]{x - 16, x - 4, x - 16}, new double[]{cy - 9, cy, cy + 9}, 3);
-                Draw.shadowText(gc, label, x + 8, cy, selectedFont, Draw.CREAM, TextAlignment.LEFT);
+                double right = left + width;
+                gc.setFill(new LinearGradient(left, 0, right, 0, false, CycleMethod.NO_CYCLE,
+                        new Stop(0, Color.rgb(150, 22, 36, 0.92)), new Stop(0.75, Color.rgb(110, 16, 28, 0.75)),
+                        new Stop(1, Color.rgb(110, 16, 28, 0.0))));
+                gc.fillPolygon(new double[]{left, right, right - 14, right},
+                        new double[]{cy - h / 2, cy - h / 2, cy, cy + h / 2}, 4);
+                gc.fillRect(left, cy - h / 2, width - 14, h);
+                gc.setFill(Color.rgb(201, 162, 74, 0.55 + 0.35 * glow));
+                gc.fillRect(left, cy - h / 2, 3, h);
+                Ui.diamond(gc, x - 6, cy, 5, Draw.GOLD);
+                Draw.shadowText(gc, label, x + 10, cy, selectedFont, Draw.CREAM, TextAlignment.LEFT);
             } else {
-                Draw.shadowText(gc, label, x, cy, font, Draw.TEXT_DIM, TextAlignment.LEFT);
+                Ui.diamond(gc, x - 6, cy, 3, Color.rgb(201, 162, 74, 0.35));
+                Draw.shadowText(gc, label, x + 4, cy, font, Draw.TEXT_DIM, TextAlignment.LEFT);
+            }
+            if (value != null) {
+                double vx = left + width - 70;
+                Font f = active ? selectedFont : font;
+                Color c = active ? Draw.CREAM : Draw.TEXT_DIM;
+                Draw.shadowText(gc, value, vx, cy, f, active ? Draw.GOLD : Draw.TEXT_DIM, TextAlignment.CENTER);
+                double half = Math.max(22, Ui.width(value, f) / 2 + 14);
+                if (option.adjust() != null) {
+                    chevron(gc, vx - half, cy, -1, c);
+                    chevron(gc, vx + half, cy, 1, c);
+                }
             }
         }
+    }
+
+    private static void chevron(GraphicsContext gc, double cx, double cy, int dir, Color color) {
+        gc.setFill(color);
+        gc.fillPolygon(new double[]{cx - dir * 4, cx + dir * 4, cx - dir * 4},
+                new double[]{cy - 6, cy, cy + 6}, 3);
     }
 
     private void move(int step) {

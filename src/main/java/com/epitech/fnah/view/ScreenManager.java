@@ -1,18 +1,16 @@
 package com.epitech.fnah.view;
 
+import com.epitech.fnah.config.Achievement;
 import com.epitech.fnah.config.GameConfig;
 import com.epitech.fnah.core.Game;
 import com.epitech.fnah.core.GameEvent;
 import com.epitech.fnah.core.GameState;
-import com.epitech.fnah.config.Achievement;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.input.KeyEvent;
-import javafx.scene.paint.Color;
 import javafx.scene.text.TextAlignment;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
-
 import java.util.EnumMap;
 import java.util.Map;
 
@@ -31,6 +29,8 @@ public final class ScreenManager {
     private final NightScreen night;
     private final Deque<Achievement> toasts = new ArrayDeque<>();
     private double toastTimer;
+    private final IntroScreen intro;
+    private boolean introActive = true;
     private Screen current;
     private GameState currentState;
 
@@ -45,7 +45,8 @@ public final class ScreenManager {
     public ScreenManager(Game game, Assets assets, SoundManager sound, GameConfig config) {
         this.game = game;
         this.assets = assets;
-        MenuScreen menu = new MenuScreen(game, assets, sound, config);
+        intro = new IntroScreen(assets, sound, this::endIntro);
+        MenuScreen menu = new MenuScreen(game, assets, sound, config, this::playIntro);
         night = new NightScreen(game, assets, sound);
         screens.put(GameState.MENU, menu);
         screens.put(GameState.NIGHT_INTRO, menu);
@@ -58,6 +59,30 @@ public final class ScreenManager {
         game.getEvents().subscribe(GameEvent.StateChanged.class, e -> switchTo(e.state()));
         game.getEvents().subscribe(GameEvent.AchievementUnlocked.class, e -> toasts.add(e.achievement()));
         switchTo(game.getState());
+        intro.onEnter();
+    }
+
+    /** Joue le prologue (au lancement, ou depuis le menu). */
+    public void playIntro() {
+        introActive = true;
+        intro.onEnter();
+    }
+
+    /** Passe le prologue (outils de test et de démonstration). */
+    void skipIntro() {
+        if (introActive) {
+            endIntro();
+        }
+    }
+
+    private void endIntro() {
+        introActive = false;
+        current.onEnter();
+    }
+
+    /** Écran qui reçoit le temps et les entrées : le prologue s'il est en cours. */
+    private Screen active() {
+        return introActive ? intro : current;
     }
 
     /**
@@ -66,7 +91,7 @@ public final class ScreenManager {
      * @return multiplicateur du temps
      */
     public double timeScale() {
-        return current == night ? night.timeScale() : 1.0;
+        return !introActive && current == night ? night.timeScale() : 1.0;
     }
 
     /**
@@ -77,7 +102,7 @@ public final class ScreenManager {
     public void update(double dt) {
         syncToGameState();
         if (game.getState() != GameState.PAUSED) {
-            current.update(dt);
+            active().update(dt);
         }
         if (!toasts.isEmpty()) {
             toastTimer += dt;
@@ -95,7 +120,7 @@ public final class ScreenManager {
      */
     public void render(GraphicsContext gc) {
         syncToGameState();
-        current.render(gc);
+        active().render(gc);
         drawToast(gc);
     }
 
@@ -106,16 +131,13 @@ public final class ScreenManager {
             return;
         }
         double slide = Math.min(1.0, Math.min(toastTimer, TOAST_DURATION - toastTimer) / 0.3);
-        double y = -80 + 110 * slide;
-        gc.setFill(Color.rgb(20, 14, 14, 0.94));
-        gc.fillRoundRect(Draw.W / 2 - 260, y, 520, 70, 12, 12);
-        gc.setStroke(Draw.GOLD);
-        gc.setLineWidth(2);
-        gc.strokeRoundRect(Draw.W / 2 - 260, y, 520, 70, 12, 12);
-        Draw.text(gc, "ÉTOILE OBTENUE : " + achievement.getTitle(), Draw.W / 2, y + 24, assets.title(22),
-                Draw.GOLD, TextAlignment.CENTER);
-        Draw.text(gc, achievement.getDescription(), Draw.W / 2, y + 50, assets.ui(16), Draw.TEXT,
-                TextAlignment.CENTER);
+        double y = -90 + 112 * slide;
+        double x = Draw.W / 2 - 260;
+        Ui.panel(gc, x, y, 520, 72, Draw.GOLD);
+        Ui.star(gc, x + 42, y + 36, 20, true);
+        Draw.text(gc, "ÉTOILE OBTENUE", x + 80, y + 22, assets.ui(12), Draw.GOLD, TextAlignment.LEFT);
+        Draw.text(gc, achievement.getTitle(), x + 80, y + 44, assets.title(22), Draw.CREAM, TextAlignment.LEFT);
+        Draw.text(gc, achievement.getDescription(), x + 500, y + 58, assets.ui(12), Draw.TEXT_DIM, TextAlignment.RIGHT);
     }
 
     /**
@@ -125,7 +147,7 @@ public final class ScreenManager {
      */
     public void onKeyReleased(KeyEvent event) {
         syncToGameState();
-        current.onKeyReleased(event);
+        active().onKeyReleased(event);
     }
 
     /**
@@ -136,7 +158,7 @@ public final class ScreenManager {
      */
     public void onMousePressed(double x, double y) {
         syncToGameState();
-        current.onMousePressed(x, y);
+        active().onMousePressed(x, y);
     }
 
     /**
@@ -147,7 +169,7 @@ public final class ScreenManager {
      */
     public void onMouseReleased(double x, double y) {
         syncToGameState();
-        current.onMouseReleased(x, y);
+        active().onMouseReleased(x, y);
     }
 
     /**
@@ -157,7 +179,7 @@ public final class ScreenManager {
      */
     public void onKey(KeyEvent event) {
         syncToGameState();
-        current.onKey(event);
+        active().onKey(event);
     }
 
     /**
@@ -168,7 +190,7 @@ public final class ScreenManager {
      */
     public void onClick(double x, double y) {
         syncToGameState();
-        current.onClick(x, y);
+        active().onClick(x, y);
     }
 
     /**
@@ -179,7 +201,7 @@ public final class ScreenManager {
      */
     public void onMouseMove(double x, double y) {
         syncToGameState();
-        current.onMouseMove(x, y);
+        active().onMouseMove(x, y);
     }
 
     private void syncToGameState() {

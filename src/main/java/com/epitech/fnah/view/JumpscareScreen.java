@@ -60,6 +60,13 @@ final class JumpscareScreen implements Screen {
 
         gc.setFill(Color.rgb(200, 0, 20, flash ? 0.22 : 0.08));
         gc.fillRect(0, 0, Draw.W, Draw.H);
+        // Fin de la capture : l'image se coupe dans la neige, puis le noir
+        double end = GameLoop.JUMPSCARE_DURATION - time;
+        if (end < 0.35) {
+            Draw.clear(gc, Color.BLACK);
+            Draw.grain(gc, 2600, 0.5 * Math.max(0, end / 0.35));
+            Ui.vhsTracking(gc, time * 8);
+        }
         Draw.grain(gc, 1200, 0.5);
         Draw.overlay(gc, 0, 0.3, 0.95);
     }

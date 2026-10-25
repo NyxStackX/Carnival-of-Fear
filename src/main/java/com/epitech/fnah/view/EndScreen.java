@@ -9,6 +9,9 @@ import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.paint.Color;
+import javafx.scene.paint.CycleMethod;
+import javafx.scene.paint.LinearGradient;
+import javafx.scene.paint.Stop;
 import javafx.scene.text.TextAlignment;
 
 /**
@@ -75,7 +78,11 @@ final class EndScreen implements Screen {
         double cx = Draw.W / 2;
         String nightName = game.isCustomNight() ? "Nuit personnalisée" : "Nuit " + game.getCurrentNight();
         if (victory) {
-            gc.setFill(Color.rgb(255, 200, 120, 0.06));
+            // Le jour se lève : lueur chaude venue du bas
+            gc.setFill(new LinearGradient(0, 0, 0, Draw.H, false,
+                    CycleMethod.NO_CYCLE,
+                    new Stop(0.4, Color.TRANSPARENT),
+                    new Stop(1, Color.rgb(255, 170, 90, 0.22))));
             gc.fillRect(0, 0, Draw.W, Draw.H);
             Draw.shadowText(gc, "06:00", cx, 210, assets.title(150), Draw.CREAM, TextAlignment.CENTER);
             Draw.shadowText(gc, nightName.toUpperCase() + " TERMINÉE", cx, 330, assets.title(44),
@@ -112,9 +119,15 @@ final class EndScreen implements Screen {
                 reason = "La nuit s'est arrêtée à " + survivedUntil + ".";
             }
             Draw.text(gc, reason, cx, 330, assets.ui(22), Draw.TEXT, TextAlignment.CENTER);
+            Ui.diamond(gc, cx - 90, 372, 3, Draw.GOLD);
+            Ui.diamond(gc, cx + 90, 372, 3, Draw.GOLD);
             Draw.text(gc, nightName, cx, 372, assets.ui(17), Draw.TEXT_DIM, TextAlignment.CENTER);
         }
-        options.render(gc, assets.ui(24), assets.ui(28));
+        double count = victory && game.hasNextNight() || !victory || game.canPlayEnding() ? 2 : 1;
+        Ui.panel(gc, Draw.W / 2 - 200, 490, 400, count * 50 + 10);
+        options.render(gc, assets.ui(22), assets.ui(25));
+        Ui.hints(gc, Draw.W / 2, Draw.H - 34, TextAlignment.CENTER, assets.ui(13),
+                "Haut / Bas", "Choisir", "Entrée", "Valider", "Échap", "Menu");
         gc.setGlobalAlpha(1.0);
 
         Draw.grain(gc, 350, 0.15);
