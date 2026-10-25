@@ -2,12 +2,12 @@ package com.epitech.fnah.model;
 
 /**
  * La régie, où se trouve le joueur. Elle regroupe les équipements qui
- * consomment de l'énergie : la porte gauche et la tablette des caméras.
- * La porte droite et les lumières viendront s'ajouter ici.
+ * consomment de l'énergie : les portes et la tablette des caméras.
  */
 public class Office implements PowerConsumer {
 
     private final Door leftDoor = new Door(Door.Side.LEFT);
+    private final Door rightDoor = new Door(Door.Side.RIGHT);
     private final CameraSystem cameras = new CameraSystem();
 
     /** Crée une régie aux portes ouvertes, tablette baissée. */
@@ -21,6 +21,11 @@ public class Office implements PowerConsumer {
      */
     public Door getLeftDoor() {
         return leftDoor;
+    }
+
+    /** Renvoie la porte droite. */
+    public Door getRightDoor() {
+        return rightDoor;
     }
 
     /**
@@ -39,12 +44,13 @@ public class Office implements PowerConsumer {
      */
     @Override
     public int getPowerUsage() {
-        return leftDoor.getPowerUsage() + cameras.getPowerUsage();
+        return leftDoor.getPowerUsage() + rightDoor.getPowerUsage() + cameras.getPowerUsage();
     }
 
     /** Remet la régie dans son état de début de nuit (portes ouvertes, tablette baissée). */
     public void reset() {
         leftDoor.reset();
+        rightDoor.reset();
         cameras.reset();
     }
 }

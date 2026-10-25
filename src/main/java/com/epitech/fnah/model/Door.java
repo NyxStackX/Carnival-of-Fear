@@ -49,6 +49,7 @@ public class Door implements PowerConsumer {
 
     private final Side side;
     private boolean closed;
+    private boolean blocked;
     private final List<Consumer<Door>> toggleListeners = new ArrayList<>();
 
     /**
@@ -63,10 +64,23 @@ public class Door implements PowerConsumer {
 
     /** Ferme la porte si elle est ouverte, l'ouvre sinon. */
     public void toggle() {
+        if (blocked) {
+            return;
+        }
         closed = !closed;
         for (Consumer<Door> listener : toggleListeners) {
             listener.accept(this);
         }
+    }
+
+    /** Prevents the player from toggling this door until it is unblocked. */
+    public void setBlocked(boolean blocked) {
+        this.blocked = blocked;
+    }
+
+    /** Indicates whether the door controls are currently blocked. */
+    public boolean isBlocked() {
+        return blocked;
     }
 
     /**
@@ -100,6 +114,7 @@ public class Door implements PowerConsumer {
     /** Rouvre la porte en début de nuit, sans prévenir les écouteurs. */
     public void reset() {
         closed = false;
+        blocked = false;
     }
 
     /**

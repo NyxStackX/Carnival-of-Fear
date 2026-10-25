@@ -1,7 +1,9 @@
 package com.epitech.fnah.model;
 
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.function.Consumer;
 
@@ -21,6 +23,7 @@ public class CameraSystem implements PowerConsumer {
 
     private boolean open;
     private Room selected = DEFAULT_CAMERA;
+    private final Map<Room, Double> disabledCameras = new EnumMap<>(Room.class);
     private final List<Consumer<CameraSystem>> tabletListeners = new ArrayList<>();
     private final List<Consumer<CameraSystem>> selectionListeners = new ArrayList<>();
 
@@ -70,7 +73,38 @@ public class CameraSystem implements PowerConsumer {
      * @return {@code true} si la tablette est levée sur la caméra de cette salle
      */
     public boolean isWatching(Room room) {
-        return open && selected == room;
+        return open && selected == room && !isDisabled(room);
+    }
+
+    /** Disables a camera for the requested duration. */
+    public void disable(Room room, double durationSeconds) {
+        Objects.requireNonNull(room, "room");
+        if (!room.hasCamera()) {
+            throw new IllegalArgumentException(room.getDisplayName() + " has no camera");
+        }
+        if (durationSeconds <= 0) {
+            throw new IllegalArgumentException("durationSeconds must be > 0");
+        }
+        disabledCameras.put(room, durationSeconds);
+    }
+
+    /** Returns whether a camera is currently showing static. */
+    public boolean isDisabled(Room room) {
+        return disabledCameras.getOrDefault(room, 0.0) > 0;
+    }
+
+    /** Returns how long a camera has been disabled. */
+    public double getDisabledTimeRemaining(Room room) {
+        return disabledCameras.getOrDefault(room, 0.0);
+    }
+
+    /** Advances all camera interference timers. */
+    public void update(double deltaSeconds) {
+        if (deltaSeconds < 0) {
+            throw new IllegalArgumentException("deltaSeconds must be >= 0");
+        }
+        disabledCameras.replaceAll((room, remaining) -> Math.max(0, remaining - deltaSeconds));
+        disabledCameras.values().removeIf(remaining -> remaining == 0);
     }
 
     /**
@@ -105,6 +139,7 @@ public class CameraSystem implements PowerConsumer {
     public void reset() {
         open = false;
         selected = DEFAULT_CAMERA;
+        disabledCameras.clear();
     }
 
     /**
