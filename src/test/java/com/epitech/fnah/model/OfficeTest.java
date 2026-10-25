@@ -30,4 +30,22 @@ class OfficeTest {
         office.getLeftDoor().toggle();
         assertEquals(2, power.computeUsage());
     }
+
+    @Test
+    void doorAndTabletAddUp() {
+        Office office = new Office();
+        office.getLeftDoor().toggle();
+        office.getCameras().toggleTablet();
+        assertEquals(2, office.getPowerUsage());
+    }
+
+    @Test
+    void resetLowersTablet() {
+        Office office = new Office();
+        office.getCameras().toggleTablet();
+        office.getCameras().select(Room.LOGES);
+        office.reset();
+        assertFalse(office.getCameras().isOpen());
+        assertEquals(CameraSystem.DEFAULT_CAMERA, office.getCameras().getSelected());
+    }
 }
