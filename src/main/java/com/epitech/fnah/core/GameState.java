@@ -10,6 +10,8 @@ public enum GameState {
     NIGHT_INTRO,
     /** Nuit en cours. */
     PLAYING,
+    /** Nuit mise en pause par le joueur. */
+    PAUSED,
     /** Un clown attaque : animation avant la défaite. */
     JUMPSCARE,
     /** Nuit perdue. */

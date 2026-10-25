@@ -17,8 +17,10 @@ import java.util.Map;
 public final class ScreenManager {
 
     private final Map<GameState, Screen> screens = new EnumMap<>(GameState.class);
+    private final Game game;
     private final NightScreen night;
     private Screen current;
+    private GameState currentState;
 
     /**
      * Crée tous les écrans et suit les changements d'état de la partie.
@@ -29,11 +31,13 @@ public final class ScreenManager {
      * @param config progression du joueur
      */
     public ScreenManager(Game game, Assets assets, SoundManager sound, GameConfig config) {
+        this.game = game;
         MenuScreen menu = new MenuScreen(game, assets, sound, config);
         night = new NightScreen(game, assets);
         screens.put(GameState.MENU, menu);
         screens.put(GameState.NIGHT_INTRO, menu);
         screens.put(GameState.PLAYING, night);
+        screens.put(GameState.PAUSED, night);
         screens.put(GameState.JUMPSCARE, new JumpscareScreen(game, assets));
         screens.put(GameState.GAME_OVER, new EndScreen(game, assets, sound, false));
         screens.put(GameState.WIN, new EndScreen(game, assets, sound, true));
@@ -56,7 +60,10 @@ public final class ScreenManager {
      * @param dt temps écoulé en secondes
      */
     public void update(double dt) {
-        current.update(dt);
+        syncToGameState();
+        if (game.getState() != GameState.PAUSED) {
+            current.update(dt);
+        }
     }
 
     /**
@@ -65,6 +72,7 @@ public final class ScreenManager {
      * @param gc contexte graphique du canvas
      */
     public void render(GraphicsContext gc) {
+        syncToGameState();
         current.render(gc);
     }
 
@@ -74,6 +82,7 @@ public final class ScreenManager {
      * @param event touche pressée
      */
     public void onKey(KeyEvent event) {
+        syncToGameState();
         current.onKey(event);
     }
 
@@ -84,6 +93,7 @@ public final class ScreenManager {
      * @param y ordonnée
      */
     public void onClick(double x, double y) {
+        syncToGameState();
         current.onClick(x, y);
     }
 
@@ -94,16 +104,26 @@ public final class ScreenManager {
      * @param y ordonnée
      */
     public void onMouseMove(double x, double y) {
+        syncToGameState();
         current.onMouseMove(x, y);
+    }
+
+    private void syncToGameState() {
+        GameState state = game.getState();
+        if (state != currentState) {
+            switchTo(state);
+        }
     }
 
     private void switchTo(GameState state) {
         Screen next = screens.get(state);
+        GameState previousState = currentState;
         if (next != current) {
             current = next;
             current.onEnter();
-        } else if (state == GameState.PLAYING) {
+        } else if (state == GameState.PLAYING && previousState != GameState.PAUSED) {
             current.onEnter();
         }
+        currentState = state;
     }
 }

@@ -157,6 +157,11 @@ public final class SoundManager {
                 stop(menuMusic);
                 play(nightMusic);
             }
+            case PAUSED -> {
+                if (nightMusic != null) {
+                    nightMusic.pause();
+                }
+            }
             case JUMPSCARE -> {
                 stop(menuMusic);
                 stop(nightMusic);

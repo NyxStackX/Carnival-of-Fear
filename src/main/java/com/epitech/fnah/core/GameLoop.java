@@ -95,6 +95,20 @@ public final class GameLoop {
         setState(GameState.PLAYING);
     }
 
+    /** Met la nuit en pause si elle est en cours. */
+    public void pause() {
+        if (state == GameState.PLAYING) {
+            setState(GameState.PAUSED);
+        }
+    }
+
+    /** Reprend une nuit mise en pause. */
+    public void resume() {
+        if (state == GameState.PAUSED) {
+            setState(GameState.PLAYING);
+        }
+    }
+
     /**
      * Fait avancer le jeu.
      *

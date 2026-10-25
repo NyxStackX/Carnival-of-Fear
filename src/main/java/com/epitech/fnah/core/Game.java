@@ -118,6 +118,16 @@ public class Game {
         loop.setState(GameState.MENU);
     }
 
+    /** Met la nuit en pause. */
+    public void pause() {
+        loop.pause();
+    }
+
+    /** Reprend la nuit après une pause. */
+    public void resume() {
+        loop.resume();
+    }
+
     /**
      * Ouvre ou ferme la porte gauche. Sans effet si aucune nuit n'est en cours,
      * ou si la tablette est levée : le joueur doit la baisser pour atteindre la porte.

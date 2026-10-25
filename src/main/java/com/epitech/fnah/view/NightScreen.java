@@ -2,6 +2,7 @@ package com.epitech.fnah.view;
 
 import com.epitech.fnah.core.Game;
 import com.epitech.fnah.core.GameEvent;
+import com.epitech.fnah.core.GameState;
 import com.epitech.fnah.entity.Mimi;
 import com.epitech.fnah.entity.ZigEtZag;
 import com.epitech.fnah.model.CameraSystem;
@@ -40,6 +41,10 @@ final class NightScreen implements Screen {
     private static final double RIGHT_BTN_X = 812, RIGHT_BTN_Y = 300, RIGHT_BTN_W = 96, RIGHT_BTN_H = 140;
     // Barre « Caméras »
     private static final double BAR_X = 440, BAR_Y = 682, BAR_W = 400, BAR_H = 30;
+    private static final double PAUSE_X = 860, PAUSE_Y = 682, PAUSE_W = 160, PAUSE_H = 30;
+    private static final double PAUSE_PANEL_X = 390, PAUSE_PANEL_Y = 210, PAUSE_PANEL_W = 500, PAUSE_PANEL_H = 300;
+    private static final double RESUME_X = 490, RESUME_Y = 365, PAUSE_ACTION_W = 300, PAUSE_ACTION_H = 52;
+    private static final double MENU_Y = 435;
     // Plan des caméras
     private static final double MAP_X = 950, MAP_Y = 410, MAP_W = 300, MAP_H = 270;
     private static final double CAM_W = 64, CAM_H = 28;
@@ -146,11 +151,25 @@ final class NightScreen implements Screen {
         if (intro > 0) {
             drawIntro(gc);
         }
+        drawPauseButton(gc);
+        if (game.getState() == GameState.PAUSED) {
+            drawPauseOverlay(gc);
+        }
     }
 
     @Override
     public void onKey(KeyEvent event) {
         KeyCode code = event.getCode();
+        if (game.getState() == GameState.PAUSED) {
+            if (code == KeyCode.P || code == KeyCode.ESCAPE || code == KeyCode.ENTER) {
+                game.resume();
+            }
+            return;
+        }
+        if (code == KeyCode.P || code == KeyCode.ESCAPE) {
+            game.pause();
+            return;
+        }
         int camera = cameraNumber(event);
         if (code == KeyCode.Q) {
             game.toggleLeftDoor();
@@ -166,14 +185,24 @@ final class NightScreen implements Screen {
             game.selectCamera(camera);
         } else if (code == KeyCode.F2) {
             timeScale = timeScale > 1 ? 1.0 : FAST_TIME_SCALE;
-        } else if (code == KeyCode.ESCAPE) {
-            timeScale = 1.0;
-            game.returnToMenu();
         }
     }
 
     @Override
     public void onClick(double x, double y) {
+        if (game.getState() == GameState.PAUSED) {
+            if (Draw.inside(x, y, RESUME_X, RESUME_Y, PAUSE_ACTION_W, PAUSE_ACTION_H)) {
+                game.resume();
+            } else if (Draw.inside(x, y, RESUME_X, MENU_Y, PAUSE_ACTION_W, PAUSE_ACTION_H)) {
+                timeScale = 1.0;
+                game.returnToMenu();
+            }
+            return;
+        }
+        if (Draw.inside(x, y, PAUSE_X, PAUSE_Y, PAUSE_W, PAUSE_H)) {
+            game.pause();
+            return;
+        }
         boolean open = game.getOffice().getCameras().isOpen();
         if (Draw.inside(x, y, BAR_X, BAR_Y, BAR_W, BAR_H)) {
             game.toggleTablet();
@@ -563,6 +592,38 @@ final class NightScreen implements Screen {
             Draw.text(gc, label, x + CAM_W / 2, y + CAM_H / 2, assets.ui(13),
                     selected ? Color.BLACK : Draw.TEXT, TextAlignment.CENTER);
         }
+    }
+
+    private void drawPauseButton(GraphicsContext gc) {
+        gc.setFill(Color.rgb(20, 18, 18, 0.88));
+        gc.fillRoundRect(PAUSE_X, PAUSE_Y, PAUSE_W, PAUSE_H, 8, 8);
+        gc.setStroke(Draw.TEXT_DIM);
+        gc.setLineWidth(1.5);
+        gc.strokeRoundRect(PAUSE_X, PAUSE_Y, PAUSE_W, PAUSE_H, 8, 8);
+        Draw.text(gc, "PAUSE  [P]", PAUSE_X + PAUSE_W / 2, PAUSE_Y + PAUSE_H / 2,
+                assets.ui(14), Draw.CREAM, TextAlignment.CENTER);
+    }
+
+    private void drawPauseOverlay(GraphicsContext gc) {
+        gc.setFill(Color.rgb(0, 0, 0, 0.72));
+        gc.fillRect(0, 0, W, H);
+        gc.setFill(Color.web("#1a1012"));
+        gc.fillRoundRect(PAUSE_PANEL_X, PAUSE_PANEL_Y, PAUSE_PANEL_W, PAUSE_PANEL_H, 16, 16);
+        gc.setStroke(Draw.GOLD);
+        gc.setLineWidth(2);
+        gc.strokeRoundRect(PAUSE_PANEL_X, PAUSE_PANEL_Y, PAUSE_PANEL_W, PAUSE_PANEL_H, 16, 16);
+        Draw.text(gc, "PAUSE", W / 2, PAUSE_PANEL_Y + 65, assets.title(48), Draw.CREAM, TextAlignment.CENTER);
+        drawPauseAction(gc, RESUME_Y, "REPRENDRE  [P / ÉCHAP]");
+        drawPauseAction(gc, MENU_Y, "RETOUR AU MENU");
+    }
+
+    private void drawPauseAction(GraphicsContext gc, double y, String label) {
+        gc.setFill(Color.web("#2a2426"));
+        gc.fillRoundRect(RESUME_X, y, PAUSE_ACTION_W, PAUSE_ACTION_H, 8, 8);
+        gc.setStroke(Draw.TEXT_DIM);
+        gc.setLineWidth(1.5);
+        gc.strokeRoundRect(RESUME_X, y, PAUSE_ACTION_W, PAUSE_ACTION_H, 8, 8);
+        Draw.text(gc, label, W / 2, y + PAUSE_ACTION_H / 2, assets.ui(17), Draw.CREAM, TextAlignment.CENTER);
     }
 
     private Optional<Room> cameraAt(double x, double y) {

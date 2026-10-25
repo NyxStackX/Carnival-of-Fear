@@ -131,8 +131,11 @@ final class OptionList {
     private void activate(int index) {
         Runnable action = options.get(index).action();
         if (action != null) {
-            onSelect.run();
-            action.run();
+            try {
+                onSelect.run();
+            } finally {
+                action.run();
+            }
         }
     }
 
