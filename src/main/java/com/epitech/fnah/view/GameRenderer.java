@@ -6,9 +6,11 @@ import com.epitech.fnah.core.Game;
 import com.epitech.fnah.core.GameEvent;
 import com.epitech.fnah.core.GameLoop;
 import com.epitech.fnah.core.GameState;
+import com.epitech.fnah.model.CameraSystem;
 import com.epitech.fnah.model.Room;
 import javafx.geometry.VPos;
 import javafx.scene.canvas.GraphicsContext;
+import javafx.scene.image.Image;
 import javafx.scene.paint.Color;
 import javafx.scene.paint.CycleMethod;
 import javafx.scene.paint.RadialGradient;
@@ -19,14 +21,18 @@ import javafx.scene.text.FontPosture;
 import javafx.scene.text.FontWeight;
 import javafx.scene.text.TextAlignment;
 
+import java.util.EnumMap;
+import java.util.Map;
+import java.util.Optional;
 import java.util.Random;
 
 /**
  * Dessine chaque écran du jeu sur le canvas. Ne modifie jamais la logique :
  * il lit l'état de {@link Game} et s'abonne à l'{@link com.epitech.fnah.core.EventBus}
- * pour les sous-titres (déplacements de Bobo) et le jumpscare.
+ * pour les sous-titres, le grésillement des caméras et le jumpscare.
  *
- * <p>Tout est dessiné avec des formes simples en attendant les vrais sprites.</p>
+ * <p>Les vues caméras utilisent les images de {@link CameraImages}. Le reste
+ * (régie, Bobo) est dessiné avec des formes simples en attendant les sprites.</p>
  */
 public final class GameRenderer {
 
@@ -51,17 +57,45 @@ public final class GameRenderer {
     // Bouton de la porte gauche
     private static final double BTN_X = 350, BTN_Y = 320, BTN_W = 90, BTN_H = 120;
 
+    // Barre « Caméras » en bas de l'écran (lever / baisser la tablette)
+    private static final double BAR_X = 440, BAR_Y = 682, BAR_W = 400, BAR_H = 30;
+    // Plan des caméras (coin bas droit, tablette levée)
+    private static final double MAP_X = 950, MAP_Y = 420, MAP_W = 300, MAP_H = 270;
+    private static final double CAM_BTN_W = 64, CAM_BTN_H = 28;
+    private static final Map<Room, double[]> MAP_POSITIONS = new EnumMap<>(Map.of(
+            Room.PISTE_CENTRALE, new double[]{118, 34},
+            Room.GRADINS, new double[]{28, 80},
+            Room.LOGES, new double[]{208, 80},
+            Room.COULISSES_OUEST, new double[]{28, 130},
+            Room.MENAGERIE, new double[]{208, 130},
+            Room.COULOIR_GAUCHE, new double[]{28, 180},
+            Room.COULOIR_DROIT, new double[]{208, 180},
+            Room.FOSSE_ORCHESTRE, new double[]{118, 150},
+            Room.REGIE, new double[]{118, 222}));
+    // Position et taille de Bobo dans chaque vue caméra : x, y du visage, échelle
+    private static final Map<Room, double[]> BOBO_ON_CAMERA = new EnumMap<>(Map.of(
+            Room.PISTE_CENTRALE, new double[]{720, 330, 0.75},
+            Room.GRADINS, new double[]{420, 300, 0.7},
+            Room.COULISSES_OUEST, new double[]{820, 300, 0.7},
+            Room.COULOIR_GAUCHE, new double[]{640, 320, 0.6}));
+
+    private static final double SWITCH_STATIC = 0.3;
+    private static final double MOVE_STATIC = 1.0;
     private static final double SUBTITLE_DURATION = 3.0;
     private static final String FONT = "Arial";
 
     private final GraphicsContext gc;
     private final Game game;
     private final GameConfig config;
+    private final CameraImages images;
     private final Random shake = new Random();
+    private final Random noise = new Random();
 
     private String subtitle;
     private double subtitleTimer;
     private double jumpscareTime;
+    private double staticTimer;
+    private double clock;
 
     /**
      * Crée le moteur d'affichage et l'abonne aux événements de la partie.
@@ -74,8 +108,15 @@ public final class GameRenderer {
         this.gc = gc;
         this.game = game;
         this.config = config;
+        this.images = CameraImages.load();
         game.getEvents().subscribe(GameEvent.AnimatronicMoved.class, this::onAnimatronicMoved);
         game.getEvents().subscribe(GameEvent.StateChanged.class, e -> resetEffects());
+        game.getEvents().subscribe(GameEvent.CameraSelected.class, e -> staticTimer = SWITCH_STATIC);
+        game.getEvents().subscribe(GameEvent.TabletToggled.class, e -> {
+            if (e.open()) {
+                staticTimer = SWITCH_STATIC;
+            }
+        });
     }
 
     /**
@@ -84,8 +125,12 @@ public final class GameRenderer {
      * @param dt temps écoulé, pour les animations de l'affichage
      */
     public void update(double dt) {
+        clock += dt;
         if (subtitleTimer > 0) {
             subtitleTimer -= dt;
+        }
+        if (staticTimer > 0) {
+            staticTimer -= dt;
         }
         if (game.getState() == GameState.JUMPSCARE) {
             jumpscareTime += dt;
@@ -93,6 +138,10 @@ public final class GameRenderer {
     }
 
     private void onAnimatronicMoved(GameEvent.AnimatronicMoved event) {
+        CameraSystem cameras = game.getOffice().getCameras();
+        if (cameras.isWatching(event.from()) || cameras.isWatching(event.to())) {
+            staticTimer = MOVE_STATIC;
+        }
         if (event.to() == Room.REGIE) {
             return;
         }
@@ -110,6 +159,7 @@ public final class GameRenderer {
     private void resetEffects() {
         subtitleTimer = 0;
         jumpscareTime = 0;
+        staticTimer = 0;
     }
 
     /**
@@ -120,7 +170,38 @@ public final class GameRenderer {
      * @return {@code true} si le clic tombe sur le bouton de la porte gauche
      */
     public boolean isOnLeftDoorButton(double x, double y) {
-        return x >= BTN_X && x <= BTN_X + BTN_W && y >= BTN_Y && y <= BTN_Y + BTN_H;
+        return !game.getOffice().getCameras().isOpen() && inside(x, y, BTN_X, BTN_Y, BTN_W, BTN_H);
+    }
+
+    /**
+     * Indique si un clic tombe sur la barre qui lève ou baisse la tablette.
+     *
+     * @param x abscisse du clic
+     * @param y ordonnée du clic
+     * @return {@code true} si le clic tombe sur la barre « Caméras »
+     */
+    public boolean isOnTabletBar(double x, double y) {
+        return inside(x, y, BAR_X, BAR_Y, BAR_W, BAR_H);
+    }
+
+    /**
+     * Indique quelle caméra du plan se trouve sous un clic (tablette levée uniquement).
+     *
+     * @param x abscisse du clic
+     * @param y ordonnée du clic
+     * @return la salle cliquée, ou vide si le clic ne tombe sur aucune caméra
+     */
+    public Optional<Room> cameraAt(double x, double y) {
+        if (!game.getOffice().getCameras().isOpen()) {
+            return Optional.empty();
+        }
+        for (Room room : Room.withCameras()) {
+            double[] p = MAP_POSITIONS.get(room);
+            if (inside(x, y, MAP_X + p[0] - CAM_BTN_W / 2, MAP_Y + p[1] - CAM_BTN_H / 2, CAM_BTN_W, CAM_BTN_H)) {
+                return Optional.of(room);
+            }
+        }
+        return Optional.empty();
     }
 
     /**
@@ -132,7 +213,12 @@ public final class GameRenderer {
         switch (game.getState()) {
             case MENU, NIGHT_INTRO -> drawMenu();
             case PLAYING -> {
-                drawOffice();
+                if (game.getOffice().getCameras().isOpen()) {
+                    drawCameraView();
+                } else {
+                    drawOffice();
+                }
+                drawTabletBar();
                 drawHud(timeScale);
             }
             case JUMPSCARE -> drawJumpscare();
@@ -154,8 +240,10 @@ public final class GameRenderer {
                 W / 2, 370, 16, FontWeight.NORMAL, TEXT_DIM);
         text("[Entrée] Commencer     [Gauche / Droite] Choisir la nuit     [Échap] Quitter",
                 W / 2, 470, 20, FontWeight.NORMAL, TEXT_DIM);
-        text("Fermez la porte gauche [Q] quand Bobo approche. Surveillez votre énergie.",
+        text("Suivez Bobo sur les caméras [Espace], fermez la porte gauche [Q] quand il approche.",
                 W / 2, 530, 18, FontWeight.NORMAL, TEXT_DIM);
+        text("Chaque équipement consomme de l'énergie.", W / 2, 560, 18, FontWeight.NORMAL, TEXT_DIM);
+        text("[M] Couper / remettre le son", W / 2, 620, 16, FontWeight.NORMAL, TEXT_DIM);
     }
 
     private void drawOffice() {
@@ -198,6 +286,109 @@ public final class GameRenderer {
         gc.fillRect(420, 560, 520, 14);
 
         drawVignette();
+    }
+
+    private void drawCameraView() {
+        CameraSystem cameras = game.getOffice().getCameras();
+        Room room = cameras.getSelected();
+        Image image = images.get(room);
+        if (image != null) {
+            gc.drawImage(image, 0, 0, W, H);
+        } else {
+            clear(Color.web("#101010"));
+            text("Image indisponible", W / 2, H / 2, 24, FontWeight.NORMAL, TEXT_DIM);
+        }
+
+        if (game.getBobo().getRoom() == room) {
+            double[] p = BOBO_ON_CAMERA.getOrDefault(room, new double[]{W / 2, 300, 0.7});
+            drawClown(p[0], p[1], p[2]);
+        }
+
+        // Image de surveillance : assombrie, lignes de balayage, grain
+        gc.setFill(Color.rgb(0, 0, 0, 0.3));
+        gc.fillRect(0, 0, W, H);
+        gc.setStroke(Color.rgb(0, 0, 0, 0.25));
+        gc.setLineWidth(1);
+        for (double y = 0; y < H; y += 4) {
+            gc.strokeLine(0, y, W, y);
+        }
+        drawNoise(staticTimer > 0 ? 2500 : 250, staticTimer > 0 ? 0.55 : 0.12);
+        if (staticTimer > 0) {
+            gc.setFill(Color.rgb(160, 160, 160, 0.25 * Math.min(1.0, staticTimer / SWITCH_STATIC)));
+            gc.fillRect(0, 0, W, H);
+        }
+        drawVignette();
+
+        // Libellés de la caméra
+        gc.setTextAlign(TextAlignment.LEFT);
+        gc.setTextBaseline(VPos.CENTER);
+        gc.setFill(CREAM);
+        gc.setFont(Font.font(FONT, FontWeight.BOLD, 26));
+        gc.fillText(room.getCameraLabel() + " - " + room.getDisplayName(), 40, 50);
+        if (((int) (clock * 2)) % 2 == 0) {
+            gc.setFill(RED);
+            gc.fillOval(42, 80, 14, 14);
+        }
+        gc.setFill(TEXT);
+        gc.setFont(Font.font(FONT, FontWeight.BOLD, 16));
+        gc.fillText("REC", 64, 87);
+        text("[1-8] ou [Gauche / Droite] Changer de caméra", W / 2, 22, 15, FontWeight.NORMAL, TEXT_DIM);
+
+        drawCameraMap(cameras);
+    }
+
+    private void drawCameraMap(CameraSystem cameras) {
+        gc.setFill(Color.rgb(0, 0, 0, 0.6));
+        gc.fillRect(MAP_X, MAP_Y, MAP_W, MAP_H);
+        gc.setStroke(TEXT_DIM);
+        gc.setLineWidth(1);
+        gc.strokeRect(MAP_X, MAP_Y, MAP_W, MAP_H);
+
+        // Passages entre salles, lus directement dans le graphe du chapiteau
+        gc.setStroke(Color.web("#5a524b"));
+        gc.setLineWidth(3);
+        for (Room room : Room.values()) {
+            double[] a = MAP_POSITIONS.get(room);
+            for (Room next : game.getMap().neighbors(room)) {
+                if (room.ordinal() < next.ordinal()) {
+                    double[] b = MAP_POSITIONS.get(next);
+                    gc.strokeLine(MAP_X + a[0], MAP_Y + a[1], MAP_X + b[0], MAP_Y + b[1]);
+                }
+            }
+        }
+
+        for (Room room : Room.values()) {
+            double[] p = MAP_POSITIONS.get(room);
+            double x = MAP_X + p[0] - CAM_BTN_W / 2;
+            double y = MAP_Y + p[1] - CAM_BTN_H / 2;
+            boolean selected = room == cameras.getSelected();
+            gc.setFill(room == Room.REGIE ? RED_DIM : selected ? AMBER : Color.web("#2a2626"));
+            gc.fillRect(x, y, CAM_BTN_W, CAM_BTN_H);
+            gc.setStroke(selected ? CREAM : TEXT_DIM);
+            gc.setLineWidth(selected ? 2 : 1);
+            gc.strokeRect(x, y, CAM_BTN_W, CAM_BTN_H);
+            String label = room == Room.REGIE ? "VOUS" : room.getCameraLabel();
+            text(label, x + CAM_BTN_W / 2, y + CAM_BTN_H / 2, 13, FontWeight.BOLD, selected ? Color.BLACK : TEXT);
+        }
+    }
+
+    private void drawTabletBar() {
+        boolean open = game.getOffice().getCameras().isOpen();
+        gc.setFill(Color.rgb(20, 18, 18, 0.85));
+        gc.fillRect(BAR_X, BAR_Y, BAR_W, BAR_H);
+        gc.setStroke(open ? AMBER : TEXT_DIM);
+        gc.setLineWidth(1.5);
+        gc.strokeRect(BAR_X, BAR_Y, BAR_W, BAR_H);
+        String label = open ? "BAISSER LA TABLETTE  [Espace]" : "CAMÉRAS  [Espace]";
+        text(label, BAR_X + BAR_W / 2, BAR_Y + BAR_H / 2, 15, FontWeight.BOLD, open ? AMBER : TEXT);
+    }
+
+    private void drawNoise(int dots, double maxAlpha) {
+        for (int i = 0; i < dots; i++) {
+            double gray = noise.nextDouble();
+            gc.setFill(Color.gray(gray, noise.nextDouble() * maxAlpha));
+            gc.fillRect(noise.nextDouble() * W, noise.nextDouble() * H, 3, 3);
+        }
     }
 
     private void drawShutter() {
@@ -334,6 +525,10 @@ public final class GameRenderer {
         gc.setFill(new RadialGradient(0, 0, W / 2, H / 2, W * 0.75, false, CycleMethod.NO_CYCLE,
                 new Stop(0.45, Color.TRANSPARENT), new Stop(1.0, Color.rgb(0, 0, 0, 0.85))));
         gc.fillRect(0, 0, W, H);
+    }
+
+    private static boolean inside(double x, double y, double rx, double ry, double rw, double rh) {
+        return x >= rx && x <= rx + rw && y >= ry && y <= ry + rh;
     }
 
     private void showSubtitle(String text) {
