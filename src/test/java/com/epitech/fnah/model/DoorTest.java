@@ -3,6 +3,8 @@ package com.epitech.fnah.model;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -75,5 +77,27 @@ class DoorTest {
         assertFalse(rightDoor.isBlocked());
         rightDoor.toggle();
         assertTrue(rightDoor.isClosed());
+    }
+
+    @Test
+    void forceOpenIgnoresTheBlockAndNotifies() {
+        Door door = new Door(Door.Side.RIGHT);
+        door.toggle();
+        door.setBlocked(true);
+        List<Boolean> seen = new ArrayList<>();
+        door.onToggle(d -> seen.add(d.isClosed()));
+        door.forceOpen();
+        assertFalse(door.isClosed());
+        assertFalse(door.isBlocked());
+        assertEquals(List.of(false), seen);
+    }
+
+    @Test
+    void forceOpenOnAnOpenDoorIsSilent() {
+        Door door = new Door(Door.Side.LEFT);
+        List<Boolean> seen = new ArrayList<>();
+        door.onToggle(d -> seen.add(d.isClosed()));
+        door.forceOpen();
+        assertTrue(seen.isEmpty());
     }
 }

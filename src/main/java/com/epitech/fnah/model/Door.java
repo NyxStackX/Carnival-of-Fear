@@ -74,11 +74,34 @@ public class Door implements PowerConsumer {
     }
 
     /** Prevents the player from toggling this door until it is unblocked. */
+    /**
+     * Ouvre la porte même si elle est bloquée (coupure de courant) et la débloque.
+     * Les écouteurs ne sont prévenus que si elle était fermée.
+     */
+    public void forceOpen() {
+        blocked = false;
+        if (closed) {
+            closed = false;
+            for (Consumer<Door> listener : toggleListeners) {
+                listener.accept(this);
+            }
+        }
+    }
+
+    /**
+     * Bloque ou débloque les commandes de la porte (Mimi coincée dans l'embrasure).
+     *
+     * @param blocked {@code true} pour bloquer la porte dans son état actuel
+     */
     public void setBlocked(boolean blocked) {
         this.blocked = blocked;
     }
 
-    /** Indicates whether the door controls are currently blocked. */
+    /**
+     * Indique si les commandes de la porte sont bloquées.
+     *
+     * @return {@code true} si la porte ne peut plus être ouverte ni fermée
+     */
     public boolean isBlocked() {
         return blocked;
     }

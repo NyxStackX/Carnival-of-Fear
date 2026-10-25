@@ -58,4 +58,46 @@ class OfficeTest {
         assertFalse(office.getCameras().isOpen());
         assertEquals(CameraSystem.DEFAULT_CAMERA, office.getCameras().getSelected());
     }
+
+    @Test
+    void lightsAddToThePowerUsage() {
+        Office office = new Office();
+        office.getLeftLight().setOn(true);
+        office.getRightLight().setOn(true);
+        assertEquals(2 * Light.POWER_USAGE_WHEN_ON, office.getPowerUsage());
+    }
+
+    @Test
+    void cutPowerShutsEverythingDown() {
+        Office office = new Office();
+        office.getLeftDoor().toggle();
+        office.getRightDoor().toggle();
+        office.getLeftLight().setOn(true);
+        office.getOrgan().setWinding(true);
+        office.getCameras().toggleTablet();
+        office.cutPower();
+        assertFalse(office.getLeftDoor().isClosed());
+        assertFalse(office.getRightDoor().isClosed());
+        assertFalse(office.getLeftLight().isOn());
+        assertFalse(office.getOrgan().isWinding());
+        assertFalse(office.getCameras().isOpen());
+        assertEquals(0, office.getPowerUsage());
+    }
+
+    @Test
+    void cutPowerWithTabletDownKeepsItDown() {
+        Office office = new Office();
+        office.cutPower();
+        assertFalse(office.getCameras().isOpen());
+    }
+
+    @Test
+    void resetRefillsTheOrganAndSwitchesLightsOff() {
+        Office office = new Office();
+        office.getOrgan().drain(60);
+        office.getRightLight().setOn(true);
+        office.reset();
+        assertEquals(BarrelOrgan.MAX_CHARGE, office.getOrgan().getCharge());
+        assertFalse(office.getRightLight().isOn());
+    }
 }
