@@ -1,17 +1,24 @@
-# Musiques du jeu
+# Sons du jeu
 
-Déposer ici deux fichiers, lus automatiquement au lancement :
+Les effets sonores (`sfx/`) sont générés par `tools/generate_sounds.py` (synthèse,
+aucun échantillon externe) : ils sont originaux et libres de droits.
+Les deux musiques ont été fournies par l'équipe et converties en WAV.
 
-| Fichier | Quand | Volume |
-|---|---|---|
-| `menu.mp3` (ou `menu.wav`) | Menu principal | 60 % |
-| `nuit.mp3` (ou `nuit.wav`) | Pendant la nuit | 35 % |
+| Fichier | Rôle |
+|---|---|
+| `menu.wav` | Musique du menu : *Retro Electronics Prologue*, en boucle |
+| `nuit.wav` | Musique de la nuit : *Serenade*, en boucle |
+| `sfx/door_close.wav`, `sfx/door_open.wav` | Rideau métallique de la porte gauche |
+| `sfx/tablet_up.wav`, `sfx/tablet_down.wav` | Tablette levée / baissée |
+| `sfx/camera_switch.wav`, `sfx/static_loop.wav` | Changement de caméra, souffle de la tablette |
+| `sfx/klaxon.wav`, `sfx/footsteps.wav` | Bobo approche / s'éloigne |
+| `sfx/scream.wav` | Jumpscare |
+| `sfx/hour_bell.wav`, `sfx/chime_six.wav` | Chaque heure, victoire à 6 h |
+| `sfx/menu_move.wav`, `sfx/menu_select.wav`, `sfx/jack_pop.wav` | Menus, Pépin qui jaillit |
 
-Les deux tournent en boucle et se coupent au jumpscare. La touche `M` coupe le son.
-Si un fichier manque, le jeu reste silencieux sans planter.
+Pour changer une musique, la convertir en WAV et remplacer le fichier (le MP3 ne se lit
+pas de façon fiable sous Linux) :
 
-Utiliser uniquement des musiques libres de droits (CC0, CC-BY...) et indiquer
-l'auteur et la licence dans la section « Crédits » du README.
+    ffmpeg -i ma_musique.mp3 -ac 2 -ar 24000 menu.wav
 
-Sous Linux et WSL, la lecture des MP3 nécessite FFmpeg : `sudo apt install ffmpeg`.
-Les fichiers `.wav` fonctionnent sans installation supplémentaire.
+Indiquer le titre, l'auteur et la licence dans la section « Crédits » du README.
