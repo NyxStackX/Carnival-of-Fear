@@ -70,13 +70,32 @@ public abstract class Animatronic implements Updatable {
         if (deltaSeconds < 0) {
             throw new IllegalArgumentException("deltaSeconds must be >= 0");
         }
+        if (updateSpecialBehavior(deltaSeconds, ctx)) {
+            return;
+        }
         timer += deltaSeconds;
         while (timer >= actionInterval) {
             timer -= actionInterval;
-            if (rollAction(ctx.clock.getHour())) {
+            if (!isObserved(ctx) && rollAction(ctx.clock.getHour())) {
                 act(ctx);
             }
         }
+    }
+
+    /**
+     * Met à jour les minuteurs propres au clown avant son minuteur d'action.
+     *
+     * @param deltaSeconds temps écoulé
+     * @param ctx état de la nuit
+     * @return {@code true} si les actions normales sont en pause
+     */
+    protected boolean updateSpecialBehavior(double deltaSeconds, GameContext ctx) {
+        return false;
+    }
+
+    /** Indique si ce clown est observé par la caméra de sa salle. */
+    protected boolean isObserved(GameContext ctx) {
+        return false;
     }
 
     /**
@@ -91,6 +110,11 @@ public abstract class Animatronic implements Updatable {
     public final void reset() {
         timer = 0;
         room = startRoom;
+        resetSpecificBehavior();
+    }
+
+    /** Réinitialise l'état ajouté par le comportement propre au clown. */
+    protected void resetSpecificBehavior() {
     }
 
     /**
@@ -181,5 +205,9 @@ public abstract class Animatronic implements Updatable {
     private boolean rollAction(int hour) {
         int level = getAiLevel(hour);
         return level > 0 && dice.rollD20() <= level;
+    }
+
+    protected final int rollD20() {
+        return dice.rollD20();
     }
 }
