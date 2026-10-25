@@ -6,6 +6,7 @@ ils sont donc originaux et libres de droits.
 Utilisation (depuis la racine du projet) :
     python3 tools/generate_sounds.py src/main/resources/audio           # effets seulement
     python3 tools/generate_sounds.py src/main/resources/audio --music   # + musiques de remplacement
+    python3 tools/generate_sounds.py src/main/resources/audio --henry-entry  # motif de panne de Henry
 
 Sans --music, menu.wav et nuit.wav (les musiques choisies par l'équipe) ne sont pas touchés.
 
@@ -214,6 +215,24 @@ def night_ambience():
     return loopable(lowpass(out, 3000), 3.0)
 
 
+def henry_entry():
+    """Motif original de boîte à musique pour l'apparition de Henry."""
+    out = np.zeros(int(4.2 * RATE))
+    melody = [
+        (0.0, 'G4', 0.55),
+        (0.62, 'C5', 0.55),
+        (1.24, 'D#5', 0.55),
+        (1.86, 'D5', 0.75),
+        (2.68, 'B4', 0.55),
+        (3.3, 'G4', 0.75),
+    ]
+    for start, name, duration in melody:
+        mix_at(out, music_box(note_freq(name), duration, detune=-0.003), start, 0.7)
+    for start, name in ((0.0, 'G2'), (1.24, 'C3'), (2.68, 'G2')):
+        mix_at(out, music_box(note_freq(name), 1.4), start, 0.22)
+    return reverb(out, wet=0.55, size=2.0)
+
+
 # ---------------------------------------------------------------- effets
 
 def door_close():
@@ -359,6 +378,9 @@ def main():
         # Musiques de remplacement : n'écrase menu.wav et nuit.wav que sur demande
         save(root, 'menu', menu_music(), 0.8)
         save(root, 'nuit', night_ambience(), 0.7)
+    if '--henry-entry' in sys.argv:
+        save(root / 'sfx', 'henry_entry', henry_entry(), 0.7)
+        return
     sfx = root / 'sfx'
     for name, fn, peak in [
         ('door_close', door_close, 0.9), ('door_open', door_open, 0.7),
