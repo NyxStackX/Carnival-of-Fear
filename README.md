@@ -1,41 +1,40 @@
-# Minuit au Cirque Malvaux
+# Midnight at the Malvaux Circus
 
-Survival horror en Java (projet Epitech 2D GAME). Le joueur est veilleur de nuit dans un cirque abandonné et doit survivre de 00:00 à 06:00 pendant que d'anciens clowns rôdent sous le chapiteau.
+Survival horror game in Java (Epitech 2D GAME project). The player is a night watchman in an abandoned circus and must survive from 00:00 to 06:00 while former clowns roam beneath the big top.
 
-## État actuel
+## Current Status
 
-Version jouable avec un ennemi et deux mécaniques.
+Playable version with one enemy and two mechanics.
 
-- **Bobo** avance vers la porte gauche en suivant le plus court chemin dans le plan du chapiteau.
-- **La porte gauche** le repousse quand elle est fermée, mais consomme de l'énergie.
-- **La tablette des caméras** montre les 8 salles du chapiteau. Elle consomme de l'énergie et, tant qu'elle est levée, la porte est hors de portée.
-- Une nuit dure 6 minutes réelles. Les nuits 1 à 5 rendent Bobo de plus en plus actif.
-- La progression (nuits débloquées) est sauvegardée entre deux parties.
-- Musique du menu (*Retro Electronics Prologue*), musique de nuit (*Serenade*) et effets sonores (porte, tablette, klaxon de Bobo qui se rapproche, pas, cri, carillon de 6 h), spatialisés à gauche ou à droite.
-- Menu animé, introduction de chaque nuit, jumpscare animé, écrans de défaite et de victoire.
-- **Pépin**, le diable en boîte, dort dans la fosse d'orchestre (caméra 8) et hante le menu. Sa mécanique (l'orgue de barbarie) sera la prochaine étape.
+- **Bobo** moves toward the left door by following the shortest path through the circus map.
+- **The left door** pushes him back when closed, but consumes power.
+- **The camera tablet** shows the circus's 8 rooms. It consumes power, and while it is raised, the door is out of reach.
+- One night lasts 6 real-time minutes. Nights 1 to 5 make Bobo increasingly active.
+- Progress (unlocked nights) is saved between play sessions.
+- Menu music (*Retro Electronics Prologue*), night music (*Serenade*), and sound effects (door, tablet, Bobo's approaching horn, footsteps, scream, 6 a.m. chime), spatialized to the left or right.
+- Animated menu, introduction for each night, animated jumpscare, defeat and victory screens.
+- **Pépin**, the jack-in-the-box devil, sleeps in the orchestra pit (camera 8) and haunts the menu. His mechanic (the barrel organ) will be the next step.
 
-Prochaines étapes : rendre Pépin actif avec l'orgue de barbarie, lumière du couloir gauche, puis Mimi (voir le GDD).
+Next steps: make Pépin active with the barrel organ, add the left hallway light, then Mimi (see the GDD).
 
-## Lancer le jeu
+## Running the Game
 
-Prérequis : JDK 21 et Maven.
+Requirements: JDK 21 and Maven.
 
 ```bash
 mvn javafx:run
 ```
 
-La progression est enregistrée dans `~/.cirque-malvaux/config.properties`. Supprimer ce fichier remet le jeu à la nuit 1.
+Progress is saved in `~/.cirque-malvaux/config.properties`. Deleting this file resets the game to night 1.
 
-## Son
+## Sound
 
-Le jeu vérifie au lancement qu'une sortie audio existe. Si ce n'est pas le cas, il le signale
-dans le terminal et dans le menu (« SON : INDISPONIBLE »), puis continue sans son.
+At startup, the game checks whether an audio output is available. If not, it reports this in the terminal and in the menu ("SOUND: UNAVAILABLE"), then continues without sound.
 
-### Sous WSL (Windows)
+### Under WSL (Windows)
 
-Par défaut, Linux sous WSL n'a souvent aucune sortie audio configurée : le jeu est alors muet.
-Pour envoyer le son vers Windows (Windows 11, ou Windows 10 à jour avec WSLg) :
+By default, Linux under WSL often has no audio output configured, so the game is silent.
+To send sound to Windows (Windows 11, or an up-to-date Windows 10 with WSLg):
 
 ```bash
 sudo apt install -y libasound2-plugins alsa-utils
@@ -43,97 +42,94 @@ cat > ~/.asoundrc <<'CONF'
 pcm.!default { type pulse }
 ctl.!default { type pulse }
 CONF
-speaker-test -t sine -f 440 -l 1   # doit faire un bip, sinon voir ci-dessous
+speaker-test -t sine -f 440 -l 1   # should beep; otherwise, see below
 ```
 
-Si `speaker-test` reste muet, vérifier que `echo $PULSE_SERVER` affiche un chemin, puis
-redémarrer WSL depuis PowerShell avec `wsl --shutdown`. Sans WSLg, lancer plutôt le jeu
-directement sous Windows (JDK 21 + Maven installés côté Windows).
+If `speaker-test` remains silent, check that `echo $PULSE_SERVER` displays a path, then restart WSL from PowerShell with `wsl --shutdown`. Without WSLg, run the game directly under Windows instead (with JDK 21 + Maven installed on the Windows side).
 
 ### Formats
 
-Sous Linux, JavaFX ne lit que le **WAV** sans dépendance supplémentaire (le MP3 y demande
-une version de FFmpeg compatible). Toutes les musiques et tous les effets du jeu sont donc en WAV.
+On Linux, JavaFX only supports **WAV** without an additional dependency (MP3 requires a compatible version of FFmpeg). All game music and sound effects are therefore in WAV format.
 
-## Contrôles
+## Controls
 
-| Action | Touche |
+| Action | Key |
 |---|---|
-| Ouvrir / fermer la porte gauche | `Q` ou clic sur le bouton PORTE (tablette baissée) |
-| Lever / baisser la tablette | `Espace` ou clic sur la barre CAMÉRAS |
-| Choisir une caméra | `1` à `8`, `Gauche` / `Droite`, ou clic sur le plan |
-| Naviguer dans les menus | `Haut` / `Bas`, `Entrée`, ou la souris |
-| Choisir la nuit (menu) | `Gauche` / `Droite` sur la ligne NUIT |
-| Commencer, rejouer, nuit suivante | `Entrée` |
-| Retour au menu | `Échap` |
-| Couper / remettre le son | `M` |
-| Accélérer le temps x10 (test) | `F2` |
+| Open / close the left door | `Q` or click the DOOR button (tablet lowered) |
+| Raise / lower the tablet | `Space` or click the CAMERAS bar |
+| Choose a camera | `1` to `8`, `Left` / `Right`, or click the map |
+| Navigate menus | `Up` / `Down`, `Enter`, or the mouse |
+| Choose the night (menu) | `Left` / `Right` on the NIGHT row |
+| Start, replay, next night | `Enter` |
+| Return to the menu | `Esc` |
+| Mute / unmute sound | `M` |
+| Speed up time x10 (test) | `F2` |
 
-## Qualité
+## Quality
 
-| Commande | Résultat |
+| Command | Result |
 |---|---|
-| `mvn test` | Lance les tests et génère le rapport de couverture dans `target/site/jacoco/index.html` |
-| `mvn verify` | Comme `mvn test`, et échoue si la couverture du code logique passe sous 80 % |
-| `mvn javadoc:javadoc` | Génère la Javadoc dans `target/site/apidocs/index.html` |
+| `mvn test` | Runs the tests and generates the coverage report at `target/site/jacoco/index.html` |
+| `mvn verify` | Same as `mvn test`, and fails if logic-code coverage drops below 80% |
+| `mvn javadoc:javadoc` | Generates the Javadoc at `target/site/apidocs/index.html` |
 
-Le paquet `view` (affichage JavaFX) est exclu de la mesure de couverture : il est testé en jouant.
+The `view` package (JavaFX display) is excluded from coverage measurement: it is tested by playing the game.
 
-Chaque push sur GitHub lance `mvn verify` automatiquement (`.github/workflows/ci.yml`). Le rapport de couverture est téléchargeable depuis l'onglet Actions.
+Every push to GitHub automatically runs `mvn verify` (`.github/workflows/ci.yml`). The coverage report can be downloaded from the Actions tab.
 
-## Organisation du code
+## Code Structure
 
 ```
 com.epitech.fnah
-├── Main.java          Lanceur
-├── config/            NightConfig (réglages par nuit), GameConfig (progression sauvegardée)
-├── core/              Game (façade), GameLoop, GameClock, GameState, EventBus, GameEvent
-├── model/             PowerSystem, Door, CameraSystem (tablette), Office (régie), Room, MapGraph (plan + plus court chemin)
-├── entity/            Animatronic (base des clowns), Bobo, Dice (hasard remplaçable en test)
-└── view/              GameApp (fenêtre), ScreenManager + écrans (Menu, Night, Jumpscare, End),
-                       Assets (polices, images), SoundManager (musiques et effets), Draw, OptionList
+├── Main.java          Launcher
+├── config/            NightConfig (settings per night), GameConfig (saved progress)
+├── core/              Game (facade), GameLoop, GameClock, GameState, EventBus, GameEvent
+├── model/             PowerSystem, Door, CameraSystem (tablet), Office (control room), Room, MapGraph (map + shortest path)
+├── entity/            Animatronic (clown base class), Bobo, Dice (randomness replaceable in tests)
+└── view/              GameApp (window), ScreenManager + screens (Menu, Night, Jumpscare, End),
+                       Assets (fonts, images), SoundManager (music and effects), Draw, OptionList
 ```
 
-Ressources (`src/main/resources/`) :
+Resources (`src/main/resources/`):
 
-| Dossier | Contenu |
+| Folder | Contents |
 |---|---|
-| `images/cameras/` | Une image par salle filmée (1280x720), nommée d'après `Room` en minuscules |
-| `sprites/bobo/`, `sprites/pepin/` | Poses des clowns (`idle_1` à `idle_3`, `door` ou `grin`, `scare_1`, `scare_2`) |
-| `audio/` | `menu.wav`, `nuit.wav` et les effets dans `sfx/` |
-| `fonts/` | Rye (titres) et Special Elite (interface), avec leurs licences |
+| `images/cameras/` | One image per monitored room (1280x720), named after `Room` in lowercase |
+| `sprites/bobo/`, `sprites/pepin/` | Clown poses (`idle_1` to `idle_3`, `door` or `grin`, `scare_1`, `scare_2`) |
+| `audio/` | `menu.wav`, `nuit.wav`, and effects in `sfx/` |
+| `fonts/` | Rye (titles) and Special Elite (interface), with their licenses |
 
-Les effets sonores sont générés par `tools/generate_sounds.py` (Python, numpy, scipy) : `python3 tools/generate_sounds.py src/main/resources/audio`. Le script ne touche pas aux musiques `menu.wav` et `nuit.wav`.
+Sound effects are generated by `tools/generate_sounds.py` (Python, numpy, scipy): `python3 tools/generate_sounds.py src/main/resources/audio`. The script does not modify the `menu.wav` and `nuit.wav` music files.
 
-Images : `src/main/resources/images/cameras/<salle>.jpg` (1280x720), une par salle filmée, nommée d'après la constante de `Room` en minuscules (ex. `couloir_gauche.jpg`).
+Images: `src/main/resources/images/cameras/<room>.jpg` (1280x720), one per monitored room, named after the `Room` constant in lowercase (e.g. `left_hallway.jpg`).
 
-Règles à respecter :
+Rules to follow:
 
-- **La logique n'importe jamais JavaFX.** Tout ce qui est hors de `view/` se teste sans fenêtre.
-- **L'affichage ne modifie jamais la logique directement.** Il passe par `Game` et écoute l'`EventBus`.
-- **Le hasard passe toujours par `Dice`**, pour que les tests soient reproductibles.
+- **The logic never imports JavaFX.** Everything outside `view/` can be tested without a window.
+- **The display never modifies the logic directly.** It goes through `Game` and listens to the `EventBus`.
+- **Randomness always goes through `Dice`**, so tests are reproducible.
 
-### Patrons de conception utilisés
+### Design Patterns Used
 
-| Patron | Où | Pourquoi |
+| Pattern | Where | Why |
 |---|---|---|
-| Template Method | `Animatronic.update()` appelle `act()` | Minuteur et jet de dé communs, action propre à chaque clown |
-| Observer | `EventBus`, `GameEvent` | La logique publie, l'affichage écoute, sans dépendance entre eux |
-| Facade | `Game` | Un seul point d'entrée pour l'affichage |
-| State | `ScreenManager`, `Screen` | Un écran par état du jeu, choisi automatiquement |
-| Strategy (injection) | `Dice` | Hasard réel en jeu, valeurs fixes en test |
+| Template Method | `Animatronic.update()` calls `act()` | Shared timer and dice roll, with an action specific to each clown |
+| Observer | `EventBus`, `GameEvent` | The logic publishes events, the display listens, without depending on each other |
+| Facade | `Game` | A single entry point for the display |
+| State | `ScreenManager`, `Screen` | One screen per game state, selected automatically |
+| Strategy (injection) | `Dice` | Real randomness in the game, fixed values in tests |
 
-## Ajouter un clown
+## Adding a Clown
 
-1. Créer une classe dans `entity/` qui hérite d'`Animatronic` et implémente `act(GameContext)`.
-2. Ajouter son niveau d'IA dans `NightConfig`.
-3. L'enregistrer dans `Game` (`loop.registerSystem(...)`) et publier ses déplacements sur l'`EventBus`.
-4. Écrire ses tests avec un `Dice` fixe, sur le modèle de `BoboTest`.
+1. Create a class in `entity/` that extends `Animatronic` and implements `act(GameContext)`.
+2. Add its AI level to `NightConfig`.
+3. Register it in `Game` (`loop.registerSystem(...)`) and publish its movements through the `EventBus`.
+4. Write its tests using a fixed `Dice`, following the `BoboTest` model.
 
-## Crédits
+## Credits
 
-- **Personnages** (Bobo, Pépin) : dessins de l'équipe.
-- **Musiques** : *Retro Electronics Prologue* (menu) et *Serenade* (nuit). Auteur et licence à compléter avant la mise en ligne publique.
-- **Effets sonores** : créés par synthèse avec `tools/generate_sounds.py`, originaux.
-- **Polices** : [Rye](https://fonts.google.com/specimen/Rye) (Sorkin Type, SIL Open Font License 1.1) et [Special Elite](https://fonts.google.com/specimen/Special+Elite) (Astigmatic, Apache 2.0). Licences dans `src/main/resources/fonts/`.
-- **Images des caméras** : source et licence à compléter avant la mise en ligne publique.
+- **Characters** (Bobo, Pépin): illustrations by the team.
+- **Music**: *Retro Electronics Prologue* (menu) and *Serenade* (night). Author and license details must be completed before public release.
+- **Sound effects**: generated through synthesis with `tools/generate_sounds.py`; original.
+- **Fonts**: [Rye](https://fonts.google.com/specimen/Rye) (Sorkin Type, SIL Open Font License 1.1) and [Special Elite](https://fonts.google.com/specimen/Special+Elite) (Astigmatic, Apache 2.0). Licenses are in `src/main/resources/fonts/`.
+- **Camera images**: source and license details must be completed before public release.
