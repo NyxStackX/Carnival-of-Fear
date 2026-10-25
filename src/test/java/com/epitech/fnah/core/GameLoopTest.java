@@ -275,6 +275,6 @@ class GameLoopTest {
         loop.startNight();
         loop.getContext().office.getLeftDoor().toggle();
         loop.tick(1.0);
-        assertEquals(99.8, power.getEnergy(), 1e-9);
+        assertEquals(100 - 2 * PowerSystem.DRAIN_PER_USAGE_PER_SECOND, power.getEnergy(), 1e-9);
     }
 }

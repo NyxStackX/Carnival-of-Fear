@@ -9,11 +9,14 @@ import com.epitech.fnah.entity.Mimi;
 import com.epitech.fnah.entity.Pepin;
 import com.epitech.fnah.entity.RandomDice;
 import com.epitech.fnah.entity.ZigEtZag;
+import com.epitech.fnah.model.CameraSystem;
+import com.epitech.fnah.model.FuseBox;
 import com.epitech.fnah.model.Light;
 import com.epitech.fnah.model.MapGraph;
 import com.epitech.fnah.model.Office;
 import com.epitech.fnah.model.PowerSystem;
 import com.epitech.fnah.model.Room;
+import com.epitech.fnah.model.Safe;
 
 import java.util.Objects;
 
@@ -24,7 +27,14 @@ import java.util.Objects;
  * gère l'enchaînement des nuits, et publie ce qui se passe sur l'{@link EventBus}.
  * L'affichage n'a besoin que de cette classe.</p>
  */
-public class Game {
+public final class Game {
+
+    /** Bruit d'une porte qui claque. */
+    public static final double DOOR_NOISE = 15.0;
+    /** Bruit d'un mauvais code sur le coffre. */
+    public static final double WRONG_CODE_NOISE = 10.0;
+    /** Énergie rendue par la batterie du coffre, en pourcentage. */
+    public static final double SAFE_ENERGY = 20.0;
 
     private final GameClock clock = new GameClock();
     private final PowerSystem power = new PowerSystem();
@@ -36,6 +46,8 @@ public class Game {
     private final ZigEtZag zigEtZag;
     private final Pepin pepin;
     private final Henry henry;
+    private final TerrorDirector director;
+    private final Dice dice;
     private final GameLoop loop;
 
     private int currentNight = 1;
@@ -57,12 +69,16 @@ public class Game {
         this.zigEtZag = new ZigEtZag(1, dice);
         this.pepin = new Pepin(0, dice);
         this.henry = new Henry(dice);
+        this.director = new TerrorDirector(dice);
+        this.dice = dice;
         this.loop = new GameLoop(clock, power, office, map, events::publish);
         loop.registerSystem(bobo);
         loop.registerSystem(mimi);
         loop.registerSystem(zigEtZag);
         loop.registerSystem(pepin);
+        loop.registerSystem(director);
         loop.registerBlackoutSystem(henry);
+        loop.registerBlackoutSystem(director);
 
         loop.onStateChange(state -> events.publish(new GameEvent.StateChanged(state)));
         bobo.onMove((from, to) -> events.publish(new GameEvent.AnimatronicMoved(bobo.getName(), from, to)));
@@ -75,6 +91,33 @@ public class Game {
         clock.onHourChange(hour -> events.publish(new GameEvent.HourChanged(hour)));
         office.getCameras().onTabletToggle(cams -> events.publish(new GameEvent.TabletToggled(cams.isOpen(), cams.getSelected())));
         office.getCameras().onCameraSelected(cams -> events.publish(new GameEvent.CameraSelected(cams.getSelected())));
+        office.getLeftDoor().onToggle(door -> office.getNoise().make(DOOR_NOISE));
+        office.getRightDoor().onToggle(door -> office.getNoise().make(DOOR_NOISE));
+        office.getCameras().onTabletToggle(cams -> lookForClue());
+        office.getCameras().onCameraSelected(cams -> lookForClue());
+        office.getFuseBox().onChange(this::onFuseChanged);
+    }
+
+    /** Un chiffre du code est-il écrit sur la caméra regardée ? */
+    private void lookForClue() {
+        CameraSystem cameras = office.getCameras();
+        int index = Safe.clueIndex(cameras.getSelected());
+        if (index >= 0 && cameras.isWatching(cameras.getSelected()) && office.getSafe().discover(index)) {
+            events.publish(new GameEvent.ClueFound(index, office.getSafe().digit(index)));
+        }
+    }
+
+    /** Un circuit saute : ce qu'il alimente s'éteint aussitôt. */
+    private void onFuseChanged(FuseBox fuses) {
+        if (fuses.isTripped(FuseBox.Circuit.CAMERAS) && office.getCameras().isOpen()) {
+            setWinding(false);
+            office.getCameras().toggleTablet();
+        }
+        if (fuses.isTripped(FuseBox.Circuit.LIGHTS)) {
+            office.getLeftLight().setOn(false);
+            office.getRightLight().setOn(false);
+        }
+        events.publish(new GameEvent.FuseChanged(fuses.getTripped()));
     }
 
     /**
@@ -101,7 +144,9 @@ public class Game {
         zigEtZag.setBaseAiLevel(config.zigEtZagAiLevel());
         pepin.setBaseAiLevel(config.pepinAiLevel());
         power.setEnergyMultiplier(config.energyMultiplier());
+        director.setNight(night);
         loop.startNight();
+        newSafeCode();
         events.publish(new GameEvent.NightStarted(night, false, false));
     }
 
@@ -119,8 +164,14 @@ public class Game {
         zigEtZag.setBaseAiLevel(custom.zigEtZag());
         pepin.setBaseAiLevel(custom.pepin());
         power.setEnergyMultiplier(CustomNight.ENERGY_MULTIPLIER);
+        director.setNight(NightConfig.LAST_NIGHT);
         loop.startNight();
+        newSafeCode();
         events.publish(new GameEvent.NightStarted(currentNight, true, custom.isMaxChallenge()));
+    }
+
+    private void newSafeCode() {
+        office.getSafe().setCode(dice.rollD20() % 10, dice.rollD20() * 7 % 10, dice.rollD20() * 3 % 10);
     }
 
     /** Relance la nuit en cours (ou la nuit personnalisée) depuis le début. */
@@ -245,7 +296,7 @@ public class Game {
     }
 
     private void setLight(Light light, boolean on) {
-        light.setOn(on && canReachDesk());
+        light.setOn(on && canReachDesk() && !office.getFuseBox().isTripped(FuseBox.Circuit.LIGHTS));
     }
 
     /**
@@ -266,14 +317,77 @@ public class Game {
         setLeftLight(false);
         setRightLight(false);
         setWinding(false);
+        setFuseReset(false);
     }
 
-    /** Lève ou baisse la tablette des caméras. Sans effet si aucune nuit n'est en cours ou sans courant. */
+    /**
+     * Lève ou baisse la tablette des caméras. Sans effet si aucune nuit n'est en cours,
+     * sans courant, si le joueur est caché ou si le fusible des caméras a sauté
+     * (la baisser reste possible).
+     */
     public void toggleTablet() {
-        if (loop.getState() == GameState.PLAYING && !power.isPowerOut()) {
+        boolean open = office.getCameras().isOpen();
+        boolean blocked = !open && (office.isHidden() || office.getFuseBox().isTripped(FuseBox.Circuit.CAMERAS));
+        if (loop.getState() == GameState.PLAYING && !power.isPowerOut() && !blocked) {
             releaseControls();
             office.getCameras().toggleTablet();
         }
+    }
+
+    /**
+     * Se cache sous le bureau ou en sort. Caché, le joueur ne peut plus rien
+     * utiliser, mais Pépin ne le trouve pas s'il reste silencieux. Impossible
+     * pendant une coupure de courant.
+     */
+    public void toggleHide() {
+        if (loop.getState() != GameState.PLAYING || power.isPowerOut()) {
+            return;
+        }
+        boolean hide = !office.isHidden();
+        if (hide) {
+            releaseControls();
+            if (office.getCameras().isOpen()) {
+                office.getCameras().toggleTablet();
+            }
+        }
+        office.setHidden(hide);
+        events.publish(new GameEvent.PlayerHidden(hide));
+    }
+
+    /**
+     * Prend ou lâche le levier de la boîte à fusibles (touche maintenue). Il faut
+     * être au bureau et qu'un circuit ait sauté. Réarmer fait du bruit.
+     *
+     * @param holding {@code true} pour tenir le levier
+     */
+    public void setFuseReset(boolean holding) {
+        FuseBox fuses = office.getFuseBox();
+        boolean can = holding && canReachDesk() && fuses.getTripped() != null;
+        if (fuses.isResetting() != can) {
+            fuses.setResetting(can);
+            events.publish(new GameEvent.FuseResetting(can));
+        }
+    }
+
+    /**
+     * Tape un chiffre sur le cadran du coffre (au bureau). Un code faux fait du
+     * bruit ; le bon code ouvre le coffre et donne la batterie de secours.
+     *
+     * @param digit chiffre entre 0 et 9
+     * @return résultat, ou {@code null} si le coffre est hors de portée
+     */
+    public Safe.Result dialSafe(int digit) {
+        if (!canReachDesk()) {
+            return null;
+        }
+        Safe.Result result = office.getSafe().press(digit);
+        if (result == Safe.Result.OPENED) {
+            power.recharge(SAFE_ENERGY);
+        } else if (result == Safe.Result.WRONG) {
+            office.getNoise().make(WRONG_CODE_NOISE);
+        }
+        events.publish(new GameEvent.SafeDial(result));
+        return result;
     }
 
     /**
@@ -288,7 +402,8 @@ public class Game {
     }
 
     private boolean canReachDesk() {
-        return loop.getState() == GameState.PLAYING && !office.getCameras().isOpen() && !power.isPowerOut();
+        return loop.getState() == GameState.PLAYING && !office.getCameras().isOpen() && !power.isPowerOut()
+                && !office.isHidden();
     }
 
     /**
@@ -425,5 +540,12 @@ public class Game {
      * @return Henry
      */
     public Henry getHenry() { return henry; }
+
+    /**
+     * Renvoie le metteur en scène de la peur.
+     *
+     * @return le metteur en scène
+     */
+    public TerrorDirector getDirector() { return director; }
 
 }

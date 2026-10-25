@@ -25,22 +25,22 @@ class GameClockTest {
     }
 
     @Test
-    void oneHourEqualsSixtySeconds() {
-        clock.update(60.0);
+    void oneHourEqualsFortySeconds() {
+        clock.update(40.0);
         assertEquals(1, clock.getHour());
         assertEquals("01:00", clock.getFormattedTime());
     }
 
     @Test
-    void halfHourIsThirtySeconds() {
-        clock.update(30.0);
+    void halfHourIsTwentySeconds() {
+        clock.update(20.0);
         assertEquals(0, clock.getHour());
         assertEquals(30, clock.getMinute());
     }
 
     @Test
-    void reachesSixAMAfterSixMinutes() {
-        clock.update(360.0);
+    void reachesSixAMAfterFourMinutes() {
+        clock.update(240.0);
         assertTrue(clock.isNightOver());
         assertEquals("06:00", clock.getFormattedTime());
     }
@@ -61,7 +61,7 @@ class GameClockTest {
     void firesHourListenersInOrder() {
         List<Integer> fired = new ArrayList<>();
         clock.onHourChange(fired::add);
-        clock.update(360.0); // full night
+        clock.update(240.0); // nuit complète
         assertEquals(List.of(1, 2, 3, 4, 5, 6), fired);
     }
 
@@ -75,7 +75,7 @@ class GameClockTest {
 
     @Test
     void resetBringsBackToMidnight() {
-        clock.update(120.0);
+        clock.update(80.0);
         clock.reset();
         assertEquals(0, clock.getHour());
         assertEquals(0.0, clock.getElapsedSeconds());

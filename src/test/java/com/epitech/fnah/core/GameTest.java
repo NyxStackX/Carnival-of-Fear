@@ -8,10 +8,14 @@ import com.epitech.fnah.entity.Pepin;
 import com.epitech.fnah.model.BarrelOrgan;
 import com.epitech.fnah.model.CameraSystem;
 import com.epitech.fnah.model.Door;
+import com.epitech.fnah.model.FuseBox;
+import com.epitech.fnah.model.PowerSystem;
 import com.epitech.fnah.model.Room;
+import com.epitech.fnah.model.Safe;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -205,7 +209,7 @@ class GameTest {
         List<Integer> hours = new ArrayList<>();
         game.getEvents().subscribe(GameEvent.HourChanged.class, e -> hours.add(e.hour()));
         game.startNight(1);
-        run(game, 125);
+        run(game, GameClock.SECONDS_PER_HOUR * 2 + 5);
         assertEquals(List.of(1, 2), hours);
     }
 
@@ -266,7 +270,7 @@ class GameTest {
         game.startNight(1);
         game.toggleTablet();
         game.tick(1.0);
-        assertEquals(99.8, game.getPower().getEnergy(), 1e-9);
+        assertEquals(100 - 2 * PowerSystem.DRAIN_PER_USAGE_PER_SECOND, game.getPower().getEnergy(), 1e-9);
     }
 
     @Test
@@ -504,5 +508,171 @@ class GameTest {
         game.tick(400);
         assertEquals(GameState.WIN, game.getState());
         assertFalse(game.canPlayEnding());
+    }
+
+    // ------------------------------------------------------------------ régie enrichie
+
+    @Test
+    void nightLastsFourMinutes() {
+        Game game = quietGame(1);
+        run(game, GameClock.SECONDS_PER_HOUR * 6 - 1);
+        assertEquals(GameState.PLAYING, game.getState());
+        run(game, 2);
+        assertEquals(GameState.WIN, game.getState());
+        assertEquals(240, GameClock.SECONDS_PER_HOUR * 6);
+    }
+
+    @Test
+    void hidingLocksTheControls() {
+        Game game = quietGame(1);
+        List<Boolean> seen = new ArrayList<>();
+        game.getEvents().subscribe(GameEvent.PlayerHidden.class, e -> seen.add(e.hidden()));
+        game.toggleTablet();
+        game.toggleHide();
+        assertTrue(game.getOffice().isHidden());
+        assertFalse(game.getOffice().getCameras().isOpen());
+        game.toggleTablet();
+        game.toggleLeftDoor();
+        game.setLeftLight(true);
+        assertFalse(game.getOffice().getCameras().isOpen());
+        assertFalse(game.getOffice().getLeftDoor().isClosed());
+        assertFalse(game.getOffice().getLeftLight().isOn());
+        game.toggleHide();
+        assertFalse(game.getOffice().isHidden());
+        assertEquals(List.of(true, false), seen);
+    }
+
+    @Test
+    void cannotHideOutsideANightOrInTheDark() {
+        Game game = new Game();
+        game.toggleHide();
+        assertFalse(game.getOffice().isHidden());
+        Game dark = quietGame(1);
+        dark.getPower().setEnergyMultiplier(1000);
+        dark.tick(2);
+        dark.toggleHide();
+        assertFalse(dark.getOffice().isHidden());
+    }
+
+    @Test
+    void hidingSavesYouFromPepin() {
+        Game game = quietGame(2);
+        game.getPepin().setBaseAiLevel(20);
+        while (!game.getPepin().isOut()) {
+            game.tick(DT);
+        }
+        game.toggleHide();
+        run(game, Pepin.ESCAPE_DELAY + Pepin.SEARCH_TIME + 1);
+        assertEquals(GameState.PLAYING, game.getState());
+        assertFalse(game.getPepin().isOut());
+    }
+
+    @Test
+    void trippedFusesCutTheirCircuitUntilReset() {
+        Game game = quietGame(1);
+        List<FuseBox.Circuit> seen = new ArrayList<>();
+        game.getEvents().subscribe(GameEvent.FuseChanged.class, e -> seen.add(e.tripped()));
+        game.toggleTablet();
+        game.getOffice().getFuseBox().trip(FuseBox.Circuit.CAMERAS);
+        assertFalse(game.getOffice().getCameras().isOpen());
+        game.toggleTablet();
+        assertFalse(game.getOffice().getCameras().isOpen());
+
+        game.setFuseReset(true);
+        assertTrue(game.getOffice().getFuseBox().isResetting());
+        run(game, FuseBox.RESET_TIME + 0.5);
+        assertNull(game.getOffice().getFuseBox().getTripped());
+        game.toggleTablet();
+        assertTrue(game.getOffice().getCameras().isOpen());
+        assertEquals(Arrays.asList(FuseBox.Circuit.CAMERAS, null), seen);
+    }
+
+    @Test
+    void trippedLightsCannotBeSwitchedOn() {
+        Game game = quietGame(1);
+        game.setLeftLight(true);
+        game.getOffice().getFuseBox().trip(FuseBox.Circuit.LIGHTS);
+        assertFalse(game.getOffice().getLeftLight().isOn());
+        game.setRightLight(true);
+        assertFalse(game.getOffice().getRightLight().isOn());
+        game.setFuseReset(true);
+        game.releaseControls();
+        assertFalse(game.getOffice().getFuseBox().isResetting());
+    }
+
+    @Test
+    void leverNeedsATrippedFuse() {
+        Game game = quietGame(1);
+        game.setFuseReset(true);
+        assertFalse(game.getOffice().getFuseBox().isResetting());
+    }
+
+    @Test
+    void cluesAreFoundOnTheirCameras() {
+        Game game = quietGame(1);
+        List<GameEvent.ClueFound> seen = new ArrayList<>();
+        game.getEvents().subscribe(GameEvent.ClueFound.class, seen::add);
+        Safe safe = game.getOffice().getSafe();
+        game.toggleTablet();
+        game.selectCamera(Room.GRADINS.getCameraNumber());
+        game.selectCamera(Room.LOGES.getCameraNumber());
+        game.selectCamera(Room.LOGES.getCameraNumber());
+        assertTrue(safe.isDiscovered(0));
+        assertTrue(safe.isDiscovered(1));
+        assertFalse(safe.isDiscovered(2));
+        assertEquals(List.of(new GameEvent.ClueFound(0, safe.digit(0)), new GameEvent.ClueFound(1, safe.digit(1))), seen);
+    }
+
+    @Test
+    void openingTheSafeGivesBackEnergy() {
+        Game game = quietGame(1);
+        Safe safe = game.getOffice().getSafe();
+        run(game, 200);
+        double before = game.getPower().getEnergy();
+        assertEquals(Safe.Result.PARTIAL, game.dialSafe(safe.digit(0)));
+        game.dialSafe(safe.digit(1));
+        assertEquals(Safe.Result.OPENED, game.dialSafe(safe.digit(2)));
+        assertEquals(before + Game.SAFE_ENERGY, game.getPower().getEnergy(), 1e-6);
+    }
+
+    @Test
+    void wrongCodeMakesNoiseAndSafeIsOutOfReachFromTheTablet() {
+        Game game = quietGame(1);
+        Safe safe = game.getOffice().getSafe();
+        int wrong = (safe.digit(2) + 1) % 10;
+        game.dialSafe(safe.digit(0));
+        game.dialSafe(safe.digit(1));
+        assertEquals(Safe.Result.WRONG, game.dialSafe(wrong));
+        assertTrue(game.getOffice().getNoise().getLevel() >= Game.WRONG_CODE_NOISE);
+        game.toggleTablet();
+        assertNull(game.dialSafe(1));
+    }
+
+    @Test
+    void doorsAreNoisy() {
+        Game game = quietGame(1);
+        game.toggleLeftDoor();
+        assertEquals(Game.DOOR_NOISE, game.getOffice().getNoise().getLevel(), 1e-9);
+        run(game, 5);
+        assertEquals(0.0, game.getOffice().getNoise().getLevel());
+    }
+
+    @Test
+    void theDirectorScaresDuringTheNight() {
+        Game game = quietGame(3);
+        List<GameEvent.ScareEvent> seen = new ArrayList<>();
+        game.getEvents().subscribe(GameEvent.ScareEvent.class, seen::add);
+        run(game, 200);
+        assertFalse(seen.isEmpty());
+        assertNotNull(game.getDirector().getLast());
+    }
+
+    @Test
+    void eachNightHasANewCode() {
+        Game game = new Game(new com.epitech.fnah.entity.RandomDice(new java.util.Random(4)));
+        game.startNight(1);
+        game.getOffice().getSafe().discover(0);
+        game.startNight(2);
+        assertFalse(game.getOffice().getSafe().isDiscovered(0));
     }
 }

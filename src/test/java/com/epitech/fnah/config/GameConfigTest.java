@@ -157,4 +157,30 @@ class GameConfigTest {
             assertFalse(achievement.getDescription().isBlank());
         }
     }
+
+    @Test
+    void volumeIsClampedSavedAndLoaded() throws IOException {
+        GameConfig config = new GameConfig(file);
+        assertEquals(GameConfig.DEFAULT_VOLUME, config.getVolume());
+        config.adjustVolume(1);
+        assertEquals(GameConfig.DEFAULT_VOLUME + GameConfig.VOLUME_STEP, config.getVolume());
+        config.setVolume(150);
+        assertEquals(100, config.getVolume());
+        config.setVolume(-5);
+        assertEquals(0, config.getVolume());
+        config.setVolume(30);
+        config.save();
+        GameConfig loaded = new GameConfig(file);
+        loaded.load();
+        assertEquals(30, loaded.getVolume());
+    }
+
+    @Test
+    void invalidVolumeFallsBackToDefault() throws IOException {
+        Files.createDirectories(file.getParent());
+        Files.writeString(file, "volume=fort\n");
+        GameConfig config = new GameConfig(file);
+        config.load();
+        assertEquals(GameConfig.DEFAULT_VOLUME, config.getVolume());
+    }
 }

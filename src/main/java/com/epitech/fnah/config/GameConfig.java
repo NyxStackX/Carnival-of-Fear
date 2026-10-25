@@ -23,10 +23,17 @@ public class GameConfig {
     static final String KEY_UNLOCKED_NIGHT = "unlockedNight";
     /** Clé des étoiles obtenues dans le fichier. */
     static final String KEY_ACHIEVEMENTS = "achievements";
+    /** Clé du volume général dans le fichier. */
+    static final String KEY_VOLUME = "volume";
+    /** Volume par défaut, en pourcentage. */
+    public static final int DEFAULT_VOLUME = 80;
+    /** Pas de réglage du volume, en pourcentage. */
+    public static final int VOLUME_STEP = 10;
 
     private final Path file;
     private int unlockedNight = 1;
     private final Set<Achievement> achievements = EnumSet.noneOf(Achievement.class);
+    private int volume = DEFAULT_VOLUME;
 
     /**
      * Crée une configuration liée à un fichier, avec les valeurs par défaut.
@@ -63,6 +70,7 @@ public class GameConfig {
         unlockedNight = parseNight(props.getProperty(KEY_UNLOCKED_NIGHT));
         achievements.clear();
         achievements.addAll(parseAchievements(props.getProperty(KEY_ACHIEVEMENTS)));
+        volume = parseVolume(props.getProperty(KEY_VOLUME));
     }
 
     /**
@@ -77,6 +85,7 @@ public class GameConfig {
         }
         Properties props = new Properties();
         props.setProperty(KEY_UNLOCKED_NIGHT, Integer.toString(unlockedNight));
+        props.setProperty(KEY_VOLUME, Integer.toString(volume));
         props.setProperty(KEY_ACHIEVEMENTS, achievements.stream().map(Enum::name).collect(Collectors.joining(",")));
         try (Writer writer = Files.newBufferedWriter(file, StandardCharsets.UTF_8)) {
             props.store(writer, "Minuit au Cirque Malvaux");
@@ -139,6 +148,33 @@ public class GameConfig {
     }
 
     /**
+     * Renvoie le volume général.
+     *
+     * @return volume entre 0 et 100
+     */
+    public int getVolume() {
+        return volume;
+    }
+
+    /**
+     * Change le volume général, limité entre 0 et 100.
+     *
+     * @param volume nouveau volume, en pourcentage
+     */
+    public void setVolume(int volume) {
+        this.volume = Math.clamp(volume, 0, 100);
+    }
+
+    /**
+     * Monte ou baisse le volume d'un pas de {@value #VOLUME_STEP} %.
+     *
+     * @param step +1 pour monter, -1 pour baisser
+     */
+    public void adjustVolume(int step) {
+        setVolume(volume + step * VOLUME_STEP);
+    }
+
+    /**
      * Indique si la nuit personnalisée est accessible (nuit 5 terminée).
      *
      * @return {@code true} si la nuit 5 a été terminée
@@ -181,5 +217,16 @@ public class GameConfig {
             }
         }
         return result;
+    }
+
+    private static int parseVolume(String value) {
+        if (value == null) {
+            return DEFAULT_VOLUME;
+        }
+        try {
+            return Math.clamp(Integer.parseInt(value.trim()), 0, 100);
+        } catch (NumberFormatException e) {
+            return DEFAULT_VOLUME;
+        }
     }
 }

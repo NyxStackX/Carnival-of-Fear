@@ -11,8 +11,8 @@ import java.util.function.IntConsumer;
  */
 public class GameClock {
 
-    /** Secondes réelles par heure de jeu. */
-    public static final int SECONDS_PER_HOUR = 60;
+    /** Secondes réelles par heure de jeu : une nuit dure 4 minutes. */
+    public static final int SECONDS_PER_HOUR = 40;
     /** Heure de fin de nuit (victoire). */
     public static final int NIGHT_END_HOUR = 6;
 

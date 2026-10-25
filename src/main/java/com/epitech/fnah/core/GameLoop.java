@@ -153,6 +153,7 @@ public final class GameLoop {
         clock.update(deltaSeconds);
         power.update(deltaSeconds);
         office.getCameras().update(deltaSeconds);
+        office.update(deltaSeconds);
         if (state != GameState.PLAYING) {
             return;
         }

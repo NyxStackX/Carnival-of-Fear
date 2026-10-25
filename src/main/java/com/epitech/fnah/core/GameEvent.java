@@ -2,7 +2,9 @@ package com.epitech.fnah.core;
 
 import com.epitech.fnah.config.Achievement;
 import com.epitech.fnah.model.Door;
+import com.epitech.fnah.model.FuseBox;
 import com.epitech.fnah.model.Room;
+import com.epitech.fnah.model.Safe;
 
 /**
  * Événements publiés sur l'{@link EventBus}. Ce sont des records immuables :
@@ -119,5 +121,55 @@ public sealed interface GameEvent {
      * @param achievement étoile obtenue
      */
     record AchievementUnlocked(Achievement achievement) implements GameEvent {
+    }
+
+    /**
+     * Le metteur en scène de la peur déclenche un événement.
+     *
+     * @param scare ce qui arrive
+     * @param pan   direction du son, de -1 (gauche) à 1 (droite)
+     */
+    record ScareEvent(TerrorDirector.Scare scare, double pan) implements GameEvent {
+    }
+
+    /**
+     * Le joueur se cache sous le bureau ou en sort.
+     *
+     * @param hidden {@code true} quand il se cache
+     */
+    record PlayerHidden(boolean hidden) implements GameEvent {
+    }
+
+    /**
+     * Un fusible saute ou est réarmé.
+     *
+     * @param tripped circuit coupé, ou {@code null} quand tout remarche
+     */
+    record FuseChanged(FuseBox.Circuit tripped) implements GameEvent {
+    }
+
+    /**
+     * Le joueur prend ou lâche le levier du disjoncteur.
+     *
+     * @param resetting {@code true} quand il commence
+     */
+    record FuseResetting(boolean resetting) implements GameEvent {
+    }
+
+    /**
+     * Un chiffre du code du coffre vient d'être repéré sur une caméra.
+     *
+     * @param index rang du chiffre (0 à 2)
+     * @param digit le chiffre
+     */
+    record ClueFound(int index, int digit) implements GameEvent {
+    }
+
+    /**
+     * Un chiffre a été tapé sur le cadran du coffre.
+     *
+     * @param result ce qu'il s'est passé
+     */
+    record SafeDial(Safe.Result result) implements GameEvent {
     }
 }
