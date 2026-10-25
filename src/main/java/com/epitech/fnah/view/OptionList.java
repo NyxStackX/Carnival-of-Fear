@@ -69,6 +69,10 @@ final class OptionList {
         selected = 0;
     }
 
+    int getSelected() {
+        return selected;
+    }
+
     void onKey(KeyCode code) {
         switch (code) {
             case UP -> move(-1);
