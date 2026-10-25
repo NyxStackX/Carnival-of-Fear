@@ -45,7 +45,11 @@ public record NightConfig(int number, int boboAiLevel, double energyMultiplier) 
         return NIGHTS[night - 1];
     }
 
-    /** Niveau d'IA de départ de Mimi pour cette nuit. */
+    /**
+     * Niveau d'IA de départ de Mimi pour cette nuit.
+     *
+     * @return niveau d'IA de Mimi
+     */
     public int mimiAiLevel() {
         return switch (number) {
             case 1 -> 1;
@@ -56,7 +60,36 @@ public record NightConfig(int number, int boboAiLevel, double energyMultiplier) 
         };
     }
 
-    /** Niveau d'IA de départ de Zig et Zag pour cette nuit. */
+    /**
+     * Niveau d'IA de départ de Pépin pour cette nuit : sa boîte à musique se
+     * vide d'autant plus vite. Il dort pendant la nuit 1.
+     *
+     * @return niveau d'IA de Pépin
+     */
+    public int pepinAiLevel() {
+        return switch (number) {
+            case 1 -> 0;
+            case 2 -> 2;
+            case 3 -> 4;
+            case 4 -> 6;
+            default -> 9;
+        };
+    }
+
+    /**
+     * Indique si le veilleur commence à avoir des hallucinations (à partir de la nuit 3).
+     *
+     * @return {@code true} à partir de la nuit 3
+     */
+    public boolean hasHallucinations() {
+        return number >= 3;
+    }
+
+    /**
+     * Niveau d'IA de départ de Zig et Zag pour cette nuit.
+     *
+     * @return niveau d'IA de Zig et Zag
+     */
     public int zigEtZagAiLevel() {
         return switch (number) {
             case 1 -> 1;

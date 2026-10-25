@@ -42,4 +42,20 @@ class NightConfigTest {
         assertEquals(12, NightConfig.forNight(5).mimiAiLevel());
         assertEquals(13, NightConfig.forNight(5).zigEtZagAiLevel());
     }
+
+    @Test
+    void pepinSleepsOnNightOneThenWakesUp() {
+        assertEquals(0, NightConfig.forNight(1).pepinAiLevel());
+        for (int n = 2; n <= NightConfig.LAST_NIGHT; n++) {
+            assertTrue(NightConfig.forNight(n).pepinAiLevel() > NightConfig.forNight(n - 1).pepinAiLevel());
+        }
+    }
+
+    @Test
+    void hallucinationsStartOnNightThree() {
+        assertFalse(NightConfig.forNight(1).hasHallucinations());
+        assertFalse(NightConfig.forNight(2).hasHallucinations());
+        assertTrue(NightConfig.forNight(3).hasHallucinations());
+        assertTrue(NightConfig.forNight(5).hasHallucinations());
+    }
 }

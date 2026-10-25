@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -98,5 +99,62 @@ class GameConfigTest {
         Path path = GameConfig.inUserHome().getFile();
         assertTrue(path.startsWith(Path.of(System.getProperty("user.home"))));
         assertEquals("config.properties", path.getFileName().toString());
+    }
+
+    @Test
+    void achievementsAreSavedAndLoaded() throws IOException {
+        GameConfig config = new GameConfig(file);
+        assertTrue(config.unlock(Achievement.OPEN_DOORS));
+        assertFalse(config.unlock(Achievement.OPEN_DOORS));
+        config.unlock(Achievement.LAST_SHOW);
+        config.save();
+
+        GameConfig loaded = new GameConfig(file);
+        loaded.load();
+        assertTrue(loaded.isUnlocked(Achievement.OPEN_DOORS));
+        assertTrue(loaded.isUnlocked(Achievement.LAST_SHOW));
+        assertFalse(loaded.isUnlocked(Achievement.EYES_CLOSED));
+        assertEquals(2, loaded.getAchievements().size());
+    }
+
+    @Test
+    void unknownAchievementsAreIgnored() throws IOException {
+        Files.createDirectories(file.getParent());
+        Files.writeString(file, "achievements=NOPE, EYES_CLOSED ,,\n");
+        GameConfig config = new GameConfig(file);
+        config.load();
+        assertEquals(Set.of(Achievement.EYES_CLOSED), config.getAchievements());
+    }
+
+    @Test
+    void customNightUnlocksWithTheLastShow() {
+        GameConfig config = new GameConfig(file);
+        assertFalse(config.isCustomNightUnlocked());
+        config.unlock(Achievement.LAST_SHOW);
+        assertTrue(config.isCustomNightUnlocked());
+    }
+
+    @Test
+    void resetClearsAchievements() {
+        GameConfig config = new GameConfig(file);
+        config.unlock(Achievement.MAX_CHALLENGE);
+        config.resetProgress();
+        assertTrue(config.getAchievements().isEmpty());
+    }
+
+    @Test
+    void achievementsViewIsReadOnly() {
+        GameConfig config = new GameConfig(file);
+        assertThrows(UnsupportedOperationException.class,
+                () -> config.getAchievements().add(Achievement.LAST_SHOW));
+        assertThrows(NullPointerException.class, () -> config.unlock(null));
+    }
+
+    @Test
+    void everyAchievementHasATitleAndDescription() {
+        for (Achievement achievement : Achievement.values()) {
+            assertFalse(achievement.getTitle().isBlank());
+            assertFalse(achievement.getDescription().isBlank());
+        }
     }
 }
