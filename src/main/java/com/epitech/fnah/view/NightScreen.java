@@ -411,7 +411,7 @@ final class NightScreen implements Screen {
 
     private void drawPoster(GraphicsContext gc) {
         gc.save();
-        gc.translate(1010, 260);
+        gc.translate(W / 2, 260);
         gc.rotate(2.5);
         gc.setFill(Draw.RED_DARK);
         gc.fillRect(-125, -160, 250, 330);
