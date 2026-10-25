@@ -15,6 +15,15 @@ Les deux musiques ont été fournies par l'équipe et converties en WAV.
 | `sfx/scream.wav` | Jumpscare |
 | `sfx/hour_bell.wav`, `sfx/chime_six.wav` | Chaque heure, victoire à 6 h |
 | `sfx/menu_move.wav`, `sfx/menu_select.wav`, `sfx/jack_pop.wav` | Menus, Pépin qui jaillit |
+| `sfx/henry_entry.wav`, `sfx/henry_melody.wav` | Motif de Henry, sa mélodie en boucle pendant la coupure |
+| `sfx/breaker.wav` | Disjoncteur qui saute (énergie à 0 %) |
+| `sfx/light_buzz.wav` | Bourdonnement des lampes de couloir |
+| `sfx/organ_loop.wav`, `sfx/crank.wav` | Orgue de barbarie de Pépin (CAM 8), manivelle |
+| `sfx/heartbeat.wav` | Battement de cœur quand un clown est tout proche |
+| `sfx/rain_loop.wav`, `sfx/thunder.wav` | Orage sur le chapiteau |
+| `sfx/whisper.wav`, `sfx/child_laugh.wav` | Hallucinations (à partir de la nuit 3) |
+| `sfx/typewriter.wav`, `sfx/tape_hiss.wav` | Cassette du veilleur en début de nuit |
+| `sfx/honk.wav`, `sfx/crash_buzz.wav` | Easter eggs : nez de Bobo, faux plantage |
 
 Pour changer une musique, la convertir en WAV et remplacer le fichier (le MP3 ne se lit
 pas de façon fiable sous Linux) :

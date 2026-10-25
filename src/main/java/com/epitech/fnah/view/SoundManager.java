@@ -3,8 +3,12 @@ package com.epitech.fnah.view;
 import com.epitech.fnah.core.Game;
 import com.epitech.fnah.core.GameEvent;
 import com.epitech.fnah.core.GameState;
+import com.epitech.fnah.entity.Henry;
 import com.epitech.fnah.entity.Mimi;
+import com.epitech.fnah.entity.Pepin;
 import com.epitech.fnah.entity.ZigEtZag;
+import com.epitech.fnah.model.Door;
+import com.epitech.fnah.model.Office;
 import com.epitech.fnah.model.Room;
 import javafx.scene.media.AudioClip;
 import javafx.scene.media.Media;
@@ -18,13 +22,15 @@ import javax.sound.sampled.SourceDataLine;
 import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 /**
- * Musiques et effets sonores, déclenchés par les événements de la partie.
+ * Musiques, ambiances et effets sonores, déclenchés par les événements de la partie.
  *
  * <p>Écoute l'{@link com.epitech.fnah.core.EventBus} : la logique du jeu ne
  * connaît pas le son. Les bruits venant de la gauche (porte gauche, Bobo) sont
- * placés à gauche dans le casque, et Bobo est plus fort à mesure qu'il approche.</p>
+ * placés à gauche dans le casque, ceux de droite (Mimi) à droite, et Bobo est
+ * plus fort à mesure qu'il approche.</p>
  *
  * <p>Fichiers lus dans {@code src/main/resources/audio/} : {@code menu} et
  * {@code nuit} ({@code .mp3} prioritaire s'il est lisible, sinon {@code .wav})
@@ -37,7 +43,12 @@ public final class SoundManager {
 
     private static final String[] EFFECTS = {"door_close", "door_open", "tablet_up", "tablet_down",
         "camera_switch", "static_loop", "klaxon", "footsteps", "scream", "chime_six", "hour_bell",
-        "menu_move", "menu_select", "jack_pop", "henry_entry"};
+        "menu_move", "menu_select", "jack_pop", "henry_entry", "heartbeat", "rain_loop", "thunder",
+        "whisper", "child_laugh", "typewriter", "tape_hiss", "breaker", "light_buzz", "organ_loop",
+        "crank", "henry_melody", "crash_buzz", "honk"};
+    /** Effets joués en boucle tant qu'on ne les arrête pas. */
+    private static final Set<String> LOOPS = Set.of("static_loop", "rain_loop", "tape_hiss", "light_buzz",
+            "organ_loop", "crank", "henry_melody");
     private static final double LEFT = -0.7;
 
     private final Game game;
@@ -65,23 +76,26 @@ public final class SoundManager {
             URL url = SoundManager.class.getResource("/audio/sfx/" + name + ".wav");
             if (url != null) {
                 try {
-                    effects.put(name, new AudioClip(url.toExternalForm()));
+                    AudioClip clip = new AudioClip(url.toExternalForm());
+                    if (LOOPS.contains(name)) {
+                        clip.setCycleCount(AudioClip.INDEFINITE);
+                    }
+                    effects.put(name, clip);
                 } catch (MediaException e) {
                     System.err.println("Effet sonore illisible : " + name + " (" + e.getMessage() + ")");
                 }
             }
         }
-        AudioClip hiss = effects.get("static_loop");
-        if (hiss != null) {
-            hiss.setCycleCount(AudioClip.INDEFINITE);
-        }
 
         var events = game.getEvents();
         events.subscribe(GameEvent.StateChanged.class, e -> onState(e.state()));
         events.subscribe(GameEvent.DoorToggled.class, e -> play(e.closed() ? "door_close" : "door_open", 0.9,
-                e.side() == com.epitech.fnah.model.Door.Side.LEFT ? LEFT : -LEFT));
+                e.side() == Door.Side.LEFT ? LEFT : -LEFT));
         events.subscribe(GameEvent.TabletToggled.class, e -> onTablet(e.open()));
-        events.subscribe(GameEvent.CameraSelected.class, e -> play("camera_switch", 0.5, 0));
+        events.subscribe(GameEvent.CameraSelected.class, e -> {
+            play("camera_switch", 0.5, 0);
+            refreshOrgan();
+        });
         events.subscribe(GameEvent.AnimatronicMoved.class, this::onAnimatronicMoved);
         events.subscribe(GameEvent.FakeHornPlayed.class, e -> play("klaxon", 0.65, LEFT));
         events.subscribe(GameEvent.HourChanged.class, e -> {
@@ -89,6 +103,33 @@ public final class SoundManager {
                 play("hour_bell", 0.45, 0);
             }
         });
+        events.subscribe(GameEvent.LightToggled.class, e -> {
+            play("camera_switch", 0.3, e.side() == Door.Side.LEFT ? LEFT : -LEFT);
+            refreshLights();
+        });
+        events.subscribe(GameEvent.PowerOut.class, e -> onPowerOut());
+        events.subscribe(GameEvent.HenryMelody.class, e -> {
+            if (e.playing()) {
+                startLoop("henry_melody", 0.7);
+            } else {
+                stopClip("henry_melody");
+            }
+        });
+        events.subscribe(GameEvent.OrganWinding.class, e -> {
+            if (e.winding()) {
+                startLoop("crank", 0.5);
+            } else {
+                stopClip("crank");
+            }
+        });
+        events.subscribe(GameEvent.PepinEscaped.class, e -> {
+            play("jack_pop", e.out() ? 0.9 : 0.5, 0);
+            if (e.out()) {
+                play("child_laugh", 0.7, 0.2);
+            }
+            refreshOrgan();
+        });
+        events.subscribe(GameEvent.AchievementUnlocked.class, e -> play("chime_six", 0.5, 0));
         onState(game.getState());
     }
 
@@ -107,6 +148,58 @@ public final class SoundManager {
         play("jack_pop", 0.7, 0.4);
     }
 
+    /** Un battement de cœur (un clown est tout proche). */
+    public void heartbeat() {
+        play("heartbeat", 0.85, 0);
+    }
+
+    /** Une frappe de machine à écrire (texte de la cassette). */
+    public void typewriter() {
+        play("typewriter", 0.25, 0);
+    }
+
+    /**
+     * Lance ou arrête le souffle de la cassette.
+     *
+     * @param on {@code true} pendant la lecture de la cassette
+     */
+    public void tape(boolean on) {
+        if (on) {
+            startLoop("tape_hiss", 0.35);
+        } else {
+            stopClip("tape_hiss");
+        }
+    }
+
+    /** Coup de tonnerre (orage). */
+    public void thunder() {
+        play("thunder", 0.9, Draw.random(-0.4, 0.4));
+    }
+
+    /** Chuchotement tout près (hallucination). */
+    public void whisper() {
+        play("whisper", 0.7, Draw.random(-0.8, 0.8));
+    }
+
+    /** Rire d'enfant lointain (hallucination). */
+    public void laugh() {
+        play("child_laugh", 0.5, Draw.random(-0.8, 0.8));
+    }
+
+    /** « Pouet » du nez de clown (easter egg). */
+    public void honk() {
+        play("honk", 0.8, 0);
+    }
+
+    /** Faux plantage : tout se coupe, il ne reste qu'un bourdonnement. */
+    public void crash() {
+        if (nightMusic != null) {
+            nightMusic.pause();
+        }
+        stopLoops();
+        play("crash_buzz", 0.5, 0);
+    }
+
     /** Coupe ou rétablit tout le son. */
     public void toggleMute() {
         muted = !muted;
@@ -117,10 +210,9 @@ public final class SoundManager {
             nightMusic.setMute(muted);
         }
         if (muted) {
-            stopClip("static_loop");
-            stopClip("henry_entry");
-        } else if (game.getState() == GameState.PLAYING && game.getOffice().getCameras().isOpen()) {
-            startHiss();
+            stopLoops();
+        } else if (game.getState() == GameState.PLAYING) {
+            resumeLoops();
         }
     }
 
@@ -142,63 +234,71 @@ public final class SoundManager {
         return muted;
     }
 
-    boolean isHenryEntryAvailable() {
-        return available && !muted;
-    }
-
     private void onState(GameState state) {
         switch (state) {
-            case MENU, NIGHT_INTRO -> {
+            case MENU, NIGHT_INTRO, ENDING -> {
                 stop(nightMusic);
-                stopClip("static_loop");
+                stopLoops();
                 play(menuMusic);
             }
             case PLAYING -> {
                 stop(menuMusic);
-                play(nightMusic);
+                if (!game.getPower().isPowerOut()) {
+                    play(nightMusic);
+                }
+                resumeLoops();
             }
             case PAUSED -> {
                 if (nightMusic != null) {
                     nightMusic.pause();
                 }
+                stopLoops();
             }
             case JUMPSCARE -> {
                 stop(menuMusic);
                 stop(nightMusic);
-                stopClip("static_loop");
+                stopLoops();
                 play("scream", 0.95, 0);
             }
             case WIN -> {
                 stop(nightMusic);
-                stopClip("static_loop");
+                stopLoops();
                 play("chime_six", 0.8, 0);
             }
             case GAME_OVER -> {
                 stop(nightMusic);
-                stopClip("static_loop");
-                if (game.getPower().isPowerOut()) {
-                    play("henry_entry", 0.7, 0);
-                }
+                stopLoops();
             }
         }
+    }
+
+    private void onPowerOut() {
+        stop(nightMusic);
+        stopClip("static_loop");
+        stopClip("light_buzz");
+        stopClip("organ_loop");
+        stopClip("crank");
+        play("breaker", 0.9, 0);
     }
 
     private void onTablet(boolean open) {
         if (open) {
             play("tablet_up", 0.6, 0);
-            startHiss();
+            startLoop("static_loop", 0.12);
         } else {
             play("tablet_down", 0.6, 0);
             stopClip("static_loop");
         }
+        refreshOrgan();
     }
 
     private void onAnimatronicMoved(GameEvent.AnimatronicMoved event) {
-        if (Mimi.NAME.equals(event.name())) {
+        String name = event.name();
+        if (Mimi.NAME.equals(name)) {
             play("footsteps", 0.55, -LEFT);
             return;
         }
-        if (ZigEtZag.NAME.equals(event.name())) {
+        if (ZigEtZag.NAME.equals(name) || Pepin.NAME.equals(name) || Henry.NAME.equals(name)) {
             return;
         }
         if (event.to() == Room.REGIE) {
@@ -214,10 +314,50 @@ public final class SoundManager {
         }
     }
 
-    private void startHiss() {
-        AudioClip hiss = effects.get("static_loop");
-        if (!muted && hiss != null && !hiss.isPlaying()) {
-            hiss.play(0.12);
+    /** Relance les boucles d'ambiance qui correspondent à l'état de la nuit. */
+    private void resumeLoops() {
+        startLoop("rain_loop", 0.22);
+        if (game.getHenry().isPlayingMelody()) {
+            startLoop("henry_melody", 0.7);
+        }
+        if (game.getOffice().getCameras().isOpen()) {
+            startLoop("static_loop", 0.12);
+        }
+        refreshLights();
+        refreshOrgan();
+    }
+
+    private void refreshLights() {
+        Office office = game.getOffice();
+        if (office.getLeftLight().isOn() || office.getRightLight().isOn()) {
+            startLoop("light_buzz", 0.18);
+        } else {
+            stopClip("light_buzz");
+        }
+    }
+
+    /** L'orgue de barbarie s'entend quand on regarde la caméra 8 et qu'il joue encore. */
+    private void refreshOrgan() {
+        Office office = game.getOffice();
+        boolean audible = game.getState() == GameState.PLAYING && !game.getPower().isPowerOut()
+                && office.getCameras().isWatching(Pepin.START_ROOM) && !office.getOrgan().isEmpty();
+        if (audible) {
+            startLoop("organ_loop", 0.45);
+        } else {
+            stopClip("organ_loop");
+        }
+    }
+
+    private void stopLoops() {
+        for (String loop : LOOPS) {
+            stopClip(loop);
+        }
+    }
+
+    private void startLoop(String effect, double volume) {
+        AudioClip clip = effects.get(effect);
+        if (!muted && clip != null && !clip.isPlaying()) {
+            clip.play(volume);
         }
     }
 

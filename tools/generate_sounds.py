@@ -369,6 +369,181 @@ def jack_pop():
     return reverb(out, 0.3)
 
 
+# ---------------------------------------------------------------- ambiance de la version finale
+
+def heartbeat():
+    """Battement de cœur : deux coups sourds (« boum-boum »)."""
+    out = np.zeros(int(0.9 * RATE))
+    for start, gain in ((0.0, 1.0), (0.22, 0.7)):
+        n = int(0.25 * RATE)
+        t = t_axis(0.25)
+        f = 55 * (1 - 0.3 * t / t[-1])
+        thump = np.sin(2 * np.pi * np.cumsum(f) / RATE) * exp_decay(n, 0.06)
+        mix_at(out, lowpass(thump + 0.2 * lowpass(noise(0.25), 200) * exp_decay(n, 0.03), 300), start, gain)
+    return out
+
+
+def rain_loop():
+    """Pluie sur la toile du chapiteau : souffle continu et gouttes."""
+    seconds = 6.0
+    out = 0.5 * lowpass(noise(seconds), 1800) + 0.25 * bandpass(noise(seconds), 2500, 7000)
+    t = t_axis(seconds)
+    out *= 0.8 + 0.2 * np.sin(2 * np.pi * 0.15 * t)
+    for _ in range(260):
+        n = int(0.03 * RATE)
+        drop = bandpass(noise(0.03), 1200, 4000) * exp_decay(n, 0.006)
+        mix_at(out, drop, rng.uniform(0, seconds - 0.05), rng.uniform(0.2, 0.7))
+    return loopable(out, 1.0)
+
+
+def thunder():
+    """Coup de tonnerre : craquement sec puis grondement qui roule."""
+    seconds = 5.0
+    n = int(seconds * RATE)
+    t = t_axis(seconds)
+    crack = highpass(noise(0.4), 800) * exp_decay(int(0.4 * RATE), 0.08)
+    rumble = lowpass(noise(seconds), 140) * (1 - np.exp(-t / 0.15)) * np.exp(-t / 1.6)
+    rumble *= 1 + 0.6 * np.sin(2 * np.pi * 1.3 * t) * np.exp(-t / 2)
+    out = 3.0 * rumble
+    mix_at(out, crack, 0.0, 0.8)
+    return reverb(out, 0.4, 2.5)
+
+
+def whisper():
+    """Chuchotement : souffle découpé en syllabes, sans mots reconnaissables."""
+    seconds = 2.4
+    n = int(seconds * RATE)
+    t = t_axis(seconds)
+    syllables = np.clip(np.sin(2 * np.pi * 2.6 * t + 1.2 * np.sin(2 * np.pi * 0.7 * t)), 0, 1) ** 1.5
+    breath = bandpass(noise(seconds), 900, 3200) * 0.7 + bandpass(noise(seconds), 4000, 7000) * 0.4
+    out = breath * syllables * env_adsr(n, 0.3, 0.0, 1.0, 0.6)
+    return reverb(out, 0.5, 2.0)
+
+
+def child_laugh():
+    """Petit rire d'enfant lointain, « hi hi hi », légèrement trop grave."""
+    out = np.zeros(int(1.8 * RATE))
+    for i, start in enumerate((0.0, 0.2, 0.4, 0.62)):
+        seconds = 0.16
+        n = int(seconds * RATE)
+        t = t_axis(seconds)
+        f = (520 - 30 * i) * (1 + 0.04 * np.sin(2 * np.pi * 7 * t)) * (1 - 0.15 * t / seconds)
+        phase = 2 * np.pi * np.cumsum(f) / RATE
+        saw = 2 * ((phase / (2 * np.pi)) % 1) - 1
+        voice = bandpass(saw, 300, 900) + 0.8 * bandpass(saw, 2200, 3200) + 0.2 * bandpass(noise(seconds), 2000, 5000)
+        mix_at(out, voice * env_adsr(n, 0.01, 0.05, 0.7, 0.06), start, 1.0 - 0.15 * i)
+    return reverb(lowpass(out, 3500), 0.6, 2.2)
+
+
+def typewriter():
+    """Frappe de machine à écrire."""
+    n = int(0.08 * RATE)
+    click = highpass(noise(0.08), 1500) * exp_decay(n, 0.008)
+    thud = np.sin(2 * np.pi * 180 * t_axis(0.08)) * exp_decay(n, 0.015)
+    return click + 0.5 * thud
+
+
+def tape_hiss():
+    """Souffle de cassette avec un léger ronflement."""
+    seconds = 3.0
+    t = t_axis(seconds)
+    hiss = highpass(noise(seconds), 3000) * 0.5
+    hum = 0.15 * np.sin(2 * np.pi * 50 * t) + 0.05 * np.sin(2 * np.pi * 100 * t)
+    return loopable(hiss + hum, 0.5)
+
+
+def breaker():
+    """Disjoncteur qui saute : claquement puis le bourdonnement électrique qui meurt."""
+    seconds = 2.2
+    n = int(seconds * RATE)
+    t = t_axis(seconds)
+    f = 120 * np.exp(-t / 0.5) + 15
+    hum = np.sign(np.sin(2 * np.pi * np.cumsum(f) / RATE)) * np.exp(-t / 0.6)
+    out = 0.4 * lowpass(hum, 800)
+    clunk = (lowpass(noise(0.2), 900) + np.sin(2 * np.pi * 70 * t_axis(0.2))) * exp_decay(int(0.2 * RATE), 0.04)
+    mix_at(out, clunk, 0.0, 1.2)
+    return reverb(out, 0.35, 1.5)
+
+
+def light_buzz():
+    """Bourdonnement d'une vieille ampoule de couloir."""
+    t = t_axis(1.0)
+    buzz = sum(np.sin(2 * np.pi * 100 * k * t) / k for k in range(1, 9))
+    return loopable(bandpass(buzz, 150, 2500) * (0.9 + 0.1 * np.sin(2 * np.pi * 3 * t)), 0.2)
+
+
+def reed(freq, seconds):
+    """Tuyau d'orgue de barbarie : son anche, un peu nasillard, vibrato léger."""
+    t = t_axis(seconds)
+    f = freq * (1 + 0.004 * np.sin(2 * np.pi * 5.5 * t))
+    phase = 2 * np.pi * np.cumsum(f) / RATE
+    tone = sum(np.sin(k * phase) / k ** 0.9 for k in range(1, 7))
+    return bandpass(tone, 200, 4000) * env_adsr(len(t), 0.02, 0.05, 0.85, 0.06)
+
+
+def organ_loop():
+    """Air original d'orgue de barbarie (valse en ré mineur), en boucle."""
+    beat = 0.36
+    melody = ['D5', 'F5', 'A5', 'G5', 'F5', 'E5', 'D5', 'E5', 'F5', 'A4', 'C#5', 'E5',
+              'D5', 'F5', 'A5', 'A#5', 'A5', 'G5', 'F5', 'E5', 'C#5', 'D5', None, None]
+    bass = ['D3', 'A3', 'A3', 'A2', 'E3', 'E3', 'D3', 'A3', 'A3', 'A2', 'C#3', 'E3',
+            'D3', 'A3', 'A3', 'A#2', 'F3', 'F3', 'A2', 'E3', 'E3', 'D3', 'A3', 'A3']
+    out = np.zeros(int(len(melody) * beat * RATE) + RATE)
+    for i, name in enumerate(melody):
+        if name:
+            mix_at(out, reed(note_freq(name) * 0.997, beat * 0.92), i * beat, 0.5)
+    for i, name in enumerate(bass):
+        mix_at(out, reed(note_freq(name), beat * (0.5 if i % 3 == 0 else 0.35)), i * beat, 0.3 if i % 3 == 0 else 0.18)
+    loop_len = int(len(melody) * beat * RATE)
+    out[:RATE] += out[loop_len:loop_len + RATE]
+    return reverb(out[:loop_len], 0.25, 1.2)
+
+
+def crank():
+    """Cliquetis de la manivelle (boucle d'une seconde, 6 crans)."""
+    out = np.zeros(int(1.0 * RATE))
+    for i in range(6):
+        n = int(0.04 * RATE)
+        tick = bandpass(noise(0.04), 1500, 5000) * exp_decay(n, 0.006)
+        tick += 0.4 * np.sin(2 * np.pi * 900 * t_axis(0.04)) * exp_decay(n, 0.01)
+        mix_at(out, tick, i / 6, 0.8 + 0.2 * (i % 2))
+    return out
+
+
+def henry_melody():
+    """Mélodie de Henry dans le noir : variation lente et désaccordée de son motif, en boucle."""
+    beat = 0.5
+    melody = ['G4', 'C5', 'D#5', 'D5', 'B4', 'G4', None, 'G4',
+              'C5', 'D#5', 'G5', 'F5', 'D#5', 'D5', 'B4', None]
+    out = np.zeros(int(len(melody) * beat * RATE) + 2 * RATE)
+    for i, name in enumerate(melody):
+        if name:
+            mix_at(out, music_box(note_freq(name), 1.4, detune=-0.006 * (i % 3)), i * beat, 0.7)
+    for i, name in enumerate(('C3', 'G2', 'G#2', 'G2')):
+        mix_at(out, music_box(note_freq(name), 2.0), i * 4 * beat, 0.25)
+    loop_len = int(len(melody) * beat * RATE)
+    out[:2 * RATE] += out[loop_len:loop_len + 2 * RATE]
+    return reverb(out[:loop_len], 0.5, 2.0)
+
+
+def crash_buzz():
+    """Faux plantage : bourdonnement numérique bloqué."""
+    t = t_axis(2.5)
+    square = np.sign(np.sin(2 * np.pi * 61 * t)) + 0.5 * np.sign(np.sin(2 * np.pi * 1220 * t))
+    return lowpass(square, 5000) * env_adsr(len(t), 0.001, 0.0, 1.0, 0.005)
+
+
+def honk():
+    """« Pouet » de nez de clown : une poire en caoutchouc aiguë."""
+    seconds = 0.35
+    t = t_axis(seconds)
+    f = 620 * (1 + 0.25 * np.sin(np.pi * t / seconds))
+    phase = 2 * np.pi * np.cumsum(f) / RATE
+    saw = 2 * ((phase / (2 * np.pi)) % 1) - 1
+    nasal = np.tanh(3 * (bandpass(saw, 700, 2000) + 0.4 * bandpass(saw, 2400, 3600)))
+    return reverb(nasal * env_adsr(len(t), 0.01, 0.05, 0.8, 0.08), 0.2)
+
+
 # ---------------------------------------------------------------- main
 
 def main():
@@ -390,6 +565,14 @@ def main():
         ('scream', scream, 0.98), ('chime_six', chime_six, 0.85),
         ('hour_bell', hour_bell, 0.6), ('menu_move', menu_move, 0.5),
         ('menu_select', menu_select, 0.7), ('jack_pop', jack_pop, 0.8),
+        # Version finale : ambiance, orage, cassette, panne, orgue, easter eggs
+        ('heartbeat', heartbeat, 0.9), ('rain_loop', rain_loop, 0.5),
+        ('thunder', thunder, 0.95), ('whisper', whisper, 0.6),
+        ('child_laugh', child_laugh, 0.6), ('typewriter', typewriter, 0.5),
+        ('tape_hiss', tape_hiss, 0.3), ('breaker', breaker, 0.9),
+        ('light_buzz', light_buzz, 0.25), ('organ_loop', organ_loop, 0.7),
+        ('crank', crank, 0.6), ('henry_melody', henry_melody, 0.75),
+        ('crash_buzz', crash_buzz, 0.6), ('honk', honk, 0.8),
     ]:
         save(sfx, name, fn(), peak)
 
