@@ -2,6 +2,7 @@ package com.epitech.fnah.core;
 
 import com.epitech.fnah.config.NightConfig;
 import com.epitech.fnah.entity.Bobo;
+import com.epitech.fnah.model.CameraSystem;
 import com.epitech.fnah.model.Door;
 import com.epitech.fnah.model.Room;
 import org.junit.jupiter.api.Test;
@@ -170,5 +171,84 @@ class GameTest {
     void exposesTheCircusMap() {
         Game game = new Game(() -> 20);
         assertEquals(1, game.getMap().distance(Room.COULOIR_GAUCHE, Room.REGIE));
+    }
+
+    @Test
+    void tabletOnlyDuringNight() {
+        Game game = new Game(() -> 20);
+        game.toggleTablet();
+        assertFalse(game.getOffice().getCameras().isOpen());
+        game.startNight(1);
+        game.toggleTablet();
+        assertTrue(game.getOffice().getCameras().isOpen());
+    }
+
+    @Test
+    void doorUnreachableWhileTabletIsUp() {
+        Game game = new Game(() -> 20);
+        game.startNight(1);
+        game.toggleTablet();
+        game.toggleLeftDoor();
+        assertFalse(game.getOffice().getLeftDoor().isClosed());
+        game.toggleTablet();
+        game.toggleLeftDoor();
+        assertTrue(game.getOffice().getLeftDoor().isClosed());
+    }
+
+    @Test
+    void camerasNeedTheTabletUp() {
+        Game game = new Game(() -> 20);
+        game.startNight(1);
+        game.selectCamera(4);
+        game.cycleCamera(1);
+        assertEquals(CameraSystem.DEFAULT_CAMERA, game.getOffice().getCameras().getSelected());
+        game.toggleTablet();
+        game.selectCamera(4);
+        assertEquals(Room.COULOIR_GAUCHE, game.getOffice().getCameras().getSelected());
+        game.cycleCamera(1);
+        assertEquals(Room.LOGES, game.getOffice().getCameras().getSelected());
+    }
+
+    @Test
+    void unknownCameraNumberIsIgnored() {
+        Game game = new Game(() -> 20);
+        game.startNight(1);
+        game.toggleTablet();
+        game.selectCamera(9);
+        assertEquals(CameraSystem.DEFAULT_CAMERA, game.getOffice().getCameras().getSelected());
+    }
+
+    @Test
+    void tabletDrainsPower() {
+        Game game = new Game(() -> 20);
+        game.startNight(1);
+        game.toggleTablet();
+        game.tick(1.0);
+        assertEquals(99.8, game.getPower().getEnergy(), 1e-9);
+    }
+
+    @Test
+    void publishesTabletAndCameraEvents() {
+        Game game = new Game(() -> 20);
+        List<GameEvent> seen = new ArrayList<>();
+        game.getEvents().subscribe(GameEvent.TabletToggled.class, seen::add);
+        game.getEvents().subscribe(GameEvent.CameraSelected.class, seen::add);
+        game.startNight(1);
+        game.toggleTablet();
+        game.selectCamera(2);
+        assertEquals(List.of(
+                new GameEvent.TabletToggled(true, CameraSystem.DEFAULT_CAMERA),
+                new GameEvent.CameraSelected(Room.GRADINS)), seen);
+    }
+
+    @Test
+    void newNightLowersTablet() {
+        Game game = new Game(() -> 20);
+        game.startNight(1);
+        game.toggleTablet();
+        game.selectCamera(5);
+        game.restartNight();
+        assertFalse(game.getOffice().getCameras().isOpen());
+        assertEquals(CameraSystem.DEFAULT_CAMERA, game.getOffice().getCameras().getSelected());
     }
 }

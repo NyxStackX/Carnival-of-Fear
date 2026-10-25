@@ -7,6 +7,7 @@ import com.epitech.fnah.entity.RandomDice;
 import com.epitech.fnah.model.MapGraph;
 import com.epitech.fnah.model.Office;
 import com.epitech.fnah.model.PowerSystem;
+import com.epitech.fnah.model.Room;
 
 /**
  * Point d'entrée de la logique du jeu pour l'affichage (patron Facade).
@@ -46,6 +47,8 @@ public class Game {
         bobo.onMove((from, to) -> events.publish(new GameEvent.AnimatronicMoved(bobo.getName(), from, to)));
         office.getLeftDoor().onToggle(door -> events.publish(new GameEvent.DoorToggled(door.getSide(), door.isClosed())));
         clock.onHourChange(hour -> events.publish(new GameEvent.HourChanged(hour)));
+        office.getCameras().onTabletToggle(cams -> events.publish(new GameEvent.TabletToggled(cams.isOpen(), cams.getSelected())));
+        office.getCameras().onCameraSelected(cams -> events.publish(new GameEvent.CameraSelected(cams.getSelected())));
     }
 
     /**
@@ -102,11 +105,48 @@ public class Game {
         loop.setState(GameState.MENU);
     }
 
-    /** Ouvre ou ferme la porte gauche. Sans effet si aucune nuit n'est en cours. */
+    /**
+     * Ouvre ou ferme la porte gauche. Sans effet si aucune nuit n'est en cours,
+     * ou si la tablette est levée : le joueur doit la baisser pour atteindre la porte.
+     */
     public void toggleLeftDoor() {
-        if (loop.getState() == GameState.PLAYING) {
+        if (loop.getState() == GameState.PLAYING && !office.getCameras().isOpen()) {
             office.getLeftDoor().toggle();
         }
+    }
+
+    /** Lève ou baisse la tablette des caméras. Sans effet si aucune nuit n'est en cours. */
+    public void toggleTablet() {
+        if (loop.getState() == GameState.PLAYING) {
+            office.getCameras().toggleTablet();
+        }
+    }
+
+    /**
+     * Affiche une caméra. Sans effet si aucune nuit n'est en cours, si la tablette
+     * est baissée, ou si aucune caméra ne porte ce numéro.
+     *
+     * @param number numéro de caméra (1 à {@value Room#CAMERA_COUNT})
+     */
+    public void selectCamera(int number) {
+        if (canUseCameras()) {
+            Room.fromCameraNumber(number).ifPresent(office.getCameras()::select);
+        }
+    }
+
+    /**
+     * Passe à la caméra suivante ou précédente. Mêmes conditions que {@link #selectCamera(int)}.
+     *
+     * @param step +1 pour la suivante, -1 pour la précédente
+     */
+    public void cycleCamera(int step) {
+        if (canUseCameras()) {
+            office.getCameras().cycle(step);
+        }
+    }
+
+    private boolean canUseCameras() {
+        return loop.getState() == GameState.PLAYING && office.getCameras().isOpen();
     }
 
     /**
