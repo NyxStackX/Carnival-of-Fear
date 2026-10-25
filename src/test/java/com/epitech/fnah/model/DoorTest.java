@@ -62,4 +62,18 @@ class DoorTest {
     void rejectsNullSide() {
         assertThrows(NullPointerException.class, () -> new Door(null));
     }
+
+    @Test
+    void blockedDoorCannotBeToggledAndResetUnblocksIt() {
+        Door rightDoor = new Door(Door.Side.RIGHT);
+        rightDoor.setBlocked(true);
+        rightDoor.toggle();
+        assertFalse(rightDoor.isClosed());
+        assertTrue(rightDoor.isBlocked());
+
+        rightDoor.reset();
+        assertFalse(rightDoor.isBlocked());
+        rightDoor.toggle();
+        assertTrue(rightDoor.isClosed());
+    }
 }

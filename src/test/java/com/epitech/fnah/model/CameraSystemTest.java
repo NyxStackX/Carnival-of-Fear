@@ -97,4 +97,26 @@ class CameraSystemTest {
         assertThrows(NullPointerException.class, () -> cameras.onTabletToggle(null));
         assertThrows(NullPointerException.class, () -> cameras.onCameraSelected(null));
     }
+
+    @Test
+    void disabledCameraShowsStaticAndExpiresAfterItsTimer() {
+        cameras.disable(Room.GRADINS, 15);
+        cameras.toggleTablet();
+        cameras.select(Room.GRADINS);
+        assertTrue(cameras.isDisabled(Room.GRADINS));
+        assertFalse(cameras.isWatching(Room.GRADINS));
+
+        cameras.update(4);
+        assertEquals(11, cameras.getDisabledTimeRemaining(Room.GRADINS));
+        cameras.update(11);
+        assertFalse(cameras.isDisabled(Room.GRADINS));
+        assertTrue(cameras.isWatching(Room.GRADINS));
+    }
+
+    @Test
+    void rejectsInvalidCameraDisruption() {
+        assertThrows(IllegalArgumentException.class, () -> cameras.disable(Room.REGIE, 1));
+        assertThrows(IllegalArgumentException.class, () -> cameras.disable(Room.GRADINS, 0));
+        assertThrows(IllegalArgumentException.class, () -> cameras.update(-1));
+    }
 }

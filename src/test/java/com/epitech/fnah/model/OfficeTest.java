@@ -18,8 +18,10 @@ class OfficeTest {
     void resetOpensDoors() {
         Office office = new Office();
         office.getLeftDoor().toggle();
+        office.getRightDoor().toggle();
         office.reset();
         assertFalse(office.getLeftDoor().isClosed());
+        assertFalse(office.getRightDoor().isClosed());
     }
 
     @Test
@@ -36,6 +38,14 @@ class OfficeTest {
         Office office = new Office();
         office.getLeftDoor().toggle();
         office.getCameras().toggleTablet();
+        assertEquals(2, office.getPowerUsage());
+    }
+
+    @Test
+    void bothDoorsAddToPowerUsage() {
+        Office office = new Office();
+        office.getLeftDoor().toggle();
+        office.getRightDoor().toggle();
         assertEquals(2, office.getPowerUsage());
     }
 
