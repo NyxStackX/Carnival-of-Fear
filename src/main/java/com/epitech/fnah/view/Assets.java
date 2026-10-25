@@ -2,6 +2,9 @@ package com.epitech.fnah.view;
 
 import com.epitech.fnah.model.Room;
 import javafx.scene.image.Image;
+import javafx.scene.image.PixelReader;
+import javafx.scene.image.PixelWriter;
+import javafx.scene.image.WritableImage;
 import javafx.scene.text.Font;
 
 import java.io.IOException;
@@ -10,6 +13,7 @@ import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.function.IntUnaryOperator;
 
 /**
  * Ressources graphiques du jeu, chargées une seule fois au lancement :
@@ -124,6 +128,59 @@ public final class Assets {
                 return null;
             }
         });
+    }
+
+    /**
+     * Version dorée d'un clown (easter egg du Bobo doré).
+     *
+     * @param character nom du dossier du clown
+     * @param frame     nom de l'image
+     * @param height    hauteur voulue en pixels
+     * @return l'image dorée, ou {@code null} si l'image d'origine n'existe pas
+     */
+    public Image golden(String character, String frame, double height) {
+        return derived(character, frame, height, "gold", argb -> {
+            int a = argb >>> 24;
+            double l = (((argb >> 16) & 0xff) * 0.3 + ((argb >> 8) & 0xff) * 0.59 + (argb & 0xff) * 0.11) / 255.0;
+            double v = 0.35 + 0.9 * l;
+            int r = (int) Math.min(255, 255 * v);
+            int g = (int) Math.min(255, 200 * v);
+            int b = (int) Math.min(255, 70 * v);
+            return (a << 24) | (r << 16) | (g << 8) | b;
+        });
+    }
+
+    /**
+     * Ombre noire d'un clown (silhouette révélée par un éclair).
+     *
+     * @param character nom du dossier du clown
+     * @param frame     nom de l'image
+     * @param height    hauteur voulue en pixels
+     * @return la silhouette, ou {@code null} si l'image d'origine n'existe pas
+     */
+    public Image silhouette(String character, String frame, double height) {
+        return derived(character, frame, height, "shadow", argb -> argb & 0xff000000);
+    }
+
+    private Image derived(String character, String frame, double height, String key, IntUnaryOperator filter) {
+        Image source = sprite(character, frame, height);
+        if (source == null) {
+            return null;
+        }
+        return scaledSprites.computeIfAbsent(character + "/" + frame + "@" + (int) Math.round(height) + "#" + key,
+                k -> {
+                    int w = (int) source.getWidth();
+                    int h = (int) source.getHeight();
+                    WritableImage out = new WritableImage(w, h);
+                    PixelReader reader = source.getPixelReader();
+                    PixelWriter writer = out.getPixelWriter();
+                    for (int y = 0; y < h; y++) {
+                        for (int x = 0; x < w; x++) {
+                            writer.setArgb(x, y, filter.applyAsInt(reader.getArgb(x, y)));
+                        }
+                    }
+                    return out;
+                });
     }
 
     private static String loadFont(String path, String fallback) {

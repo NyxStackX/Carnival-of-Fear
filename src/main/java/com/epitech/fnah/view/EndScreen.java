@@ -3,6 +3,7 @@ package com.epitech.fnah.view;
 import com.epitech.fnah.core.Game;
 import com.epitech.fnah.core.GameState;
 import com.epitech.fnah.entity.Henry;
+import com.epitech.fnah.entity.Pepin;
 import com.epitech.fnah.model.Room;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.input.KeyCode;
@@ -12,15 +13,13 @@ import javafx.scene.text.TextAlignment;
 
 /**
  * Fin de nuit : écran de défaite (« Nuit perdue ») ou de victoire (06:00),
- * avec les choix pour continuer.
+ * avec les choix pour continuer. Après la nuit 5, la victoire mène à la fin
+ * de l'histoire.
  */
 final class EndScreen implements Screen {
 
-    private static final double HENRY_ENTRY_DURATION = 4.2;
-
     private final Game game;
     private final Assets assets;
-    private final SoundManager sound;
     private final boolean victory;
     private final OptionList options;
     private javafx.scene.image.Image background;
@@ -30,7 +29,6 @@ final class EndScreen implements Screen {
     EndScreen(Game game, Assets assets, SoundManager sound, boolean victory) {
         this.game = game;
         this.assets = assets;
-        this.sound = sound;
         this.victory = victory;
         this.options = new OptionList(Draw.W / 2 - 150, 520, 50, 340, sound::menuMove, sound::menuSelect);
     }
@@ -44,6 +42,9 @@ final class EndScreen implements Screen {
             options.add(() -> "MENU", game::returnToMenu);
         } else if (game.hasNextNight()) {
             options.add(() -> "NUIT SUIVANTE", game::startNextNight);
+            options.add(() -> "MENU", this::backToMenu);
+        } else if (game.canPlayEnding()) {
+            options.add(() -> "LE LENDEMAIN...", game::playEnding);
             options.add(() -> "MENU", this::backToMenu);
         } else {
             options.add(() -> "RETOUR AU MENU", this::backToMenu);
@@ -59,11 +60,6 @@ final class EndScreen implements Screen {
 
     @Override
     public void render(GraphicsContext gc) {
-        if (isHenryIntroPlaying()) {
-            Draw.clear(gc, Color.BLACK);
-            Draw.grain(gc, 360, 0.12);
-            return;
-        }
         Draw.clear(gc, Color.BLACK);
         double fadeIn = Math.min(1.0, time / 1.2);
         gc.setGlobalAlpha(fadeIn);
@@ -77,33 +73,46 @@ final class EndScreen implements Screen {
         gc.drawImage(background, 0, 0);
 
         double cx = Draw.W / 2;
+        String nightName = game.isCustomNight() ? "Nuit personnalisée" : "Nuit " + game.getCurrentNight();
         if (victory) {
             gc.setFill(Color.rgb(255, 200, 120, 0.06));
             gc.fillRect(0, 0, Draw.W, Draw.H);
             Draw.shadowText(gc, "06:00", cx, 210, assets.title(150), Draw.CREAM, TextAlignment.CENTER);
-            Draw.shadowText(gc, "NUIT " + game.getCurrentNight() + " TERMINÉE", cx, 330, assets.title(44),
+            Draw.shadowText(gc, nightName.toUpperCase() + " TERMINÉE", cx, 330, assets.title(44),
                     Draw.GOLD, TextAlignment.CENTER);
             String line = game.hasNextNight()
                     ? "Le jour se lève sur le chapiteau. Les clowns retournent à leur place... pour l'instant."
-                    : "Cinq nuits. Vous êtes sorti vivant du Cirque Malvaux.";
+                    : game.isCustomNight()
+                    ? "La troupe salue. Vous aussi, vous faites partie du spectacle."
+                    : "Cinq nuits. Vous êtes sorti vivant du Cirque Malvaux. Du moins, c'est ce que vous croyez.";
             Draw.text(gc, line, cx, 400, assets.ui(19), Draw.TEXT, TextAlignment.CENTER);
         } else {
+            String attacker = game.getAttackerName();
             gc.save();
             gc.setGlobalAlpha(0.35 * fadeIn);
-            if (game.getPower().isPowerOut()) {
-                String frame = new String[]{"idle_1", "idle_2", "idle_3"}[(int) (time * 1.4) % 3];
-                Draw.spriteAt(gc, assets.sprite(Henry.SPRITE_ID, frame, 560), 1060, Draw.H + 20);
-            } else {
-                Draw.spriteAt(gc, assets.sprite("bobo", "idle_3", 560), 1060, Draw.H + 20);
-            }
+            String sprite = attacker == null ? "bobo" : switch (attacker) {
+                case Henry.NAME -> Henry.SPRITE_ID;
+                case Pepin.NAME -> Pepin.SPRITE_ID;
+                case "Mimi" -> "mimi";
+                case "Zig et Zag" -> "zig_et_zag";
+                default -> "bobo";
+            };
+            String frame = new String[]{"idle_1", "idle_2", "idle_3"}[(int) (time * 1.4) % 3];
+            Draw.spriteAt(gc, assets.sprite(sprite, frame, 560), 1060, Draw.H + 20);
             gc.restore();
             Draw.shadowText(gc, "NUIT PERDUE", cx, 230, assets.title(96), Draw.RED, TextAlignment.CENTER);
-            String attacker = game.getAttackerName();
-            String reason = attacker != null
-                    ? attacker + " vous a trouvé à " + survivedUntil + "."
-                    : "Panne de courant à " + survivedUntil + ". Plus rien ne les arrêtait.";
+            String reason;
+            if (Henry.NAME.equals(attacker)) {
+                reason = "Plus de courant. Henry a fini sa mélodie à " + survivedUntil + ".";
+            } else if (Pepin.NAME.equals(attacker)) {
+                reason = "L'orgue s'est tu. Pépin est sorti de sa boîte à " + survivedUntil + ".";
+            } else if (attacker != null) {
+                reason = attacker + " vous a trouvé à " + survivedUntil + ".";
+            } else {
+                reason = "La nuit s'est arrêtée à " + survivedUntil + ".";
+            }
             Draw.text(gc, reason, cx, 330, assets.ui(22), Draw.TEXT, TextAlignment.CENTER);
-            Draw.text(gc, "Nuit " + game.getCurrentNight(), cx, 372, assets.ui(17), Draw.TEXT_DIM, TextAlignment.CENTER);
+            Draw.text(gc, nightName, cx, 372, assets.ui(17), Draw.TEXT_DIM, TextAlignment.CENTER);
         }
         options.render(gc, assets.ui(24), assets.ui(28));
         gc.setGlobalAlpha(1.0);
@@ -114,7 +123,7 @@ final class EndScreen implements Screen {
 
     @Override
     public void onKey(KeyEvent event) {
-        if (time < (isHenryIntroPlaying() ? HENRY_ENTRY_DURATION : 0.6)) {
+        if (time < 0.6) {
             return;
         }
         if (event.getCode() == KeyCode.ESCAPE) {
@@ -126,7 +135,7 @@ final class EndScreen implements Screen {
 
     @Override
     public void onClick(double x, double y) {
-        if (time >= (isHenryIntroPlaying() ? HENRY_ENTRY_DURATION : 0.6)) {
+        if (time >= 0.6) {
             options.onClick(x, y);
         }
     }
@@ -141,9 +150,5 @@ final class EndScreen implements Screen {
             game.selectNight(game.getCurrentNight() + 1);
         }
         game.returnToMenu();
-    }
-
-    private boolean isHenryIntroPlaying() {
-        return game.getPower().isPowerOut() && sound.isHenryEntryAvailable() && time < HENRY_ENTRY_DURATION;
     }
 }
