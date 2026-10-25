@@ -22,6 +22,11 @@ class GameTest {
         }
     }
 
+    private static void disableMimiAndZigEtZag(Game game) {
+        game.getMimi().setBaseAiLevel(0);
+        game.getZigEtZag().setBaseAiLevel(0);
+    }
+
     @Test
     void startsInMenuOnNightOne() {
         Game game = new Game();
@@ -49,9 +54,24 @@ class GameTest {
     }
 
     @Test
+    void rightDoorToggleIsAvailableOnlyWithTabletDownDuringNight() {
+        Game game = new Game(() -> 20);
+        game.toggleRightDoor();
+        assertFalse(game.getOffice().getRightDoor().isClosed());
+        game.startNight(1);
+        game.toggleTablet();
+        game.toggleRightDoor();
+        assertFalse(game.getOffice().getRightDoor().isClosed());
+        game.toggleTablet();
+        game.toggleRightDoor();
+        assertTrue(game.getOffice().getRightDoor().isClosed());
+    }
+
+    @Test
     void openDoorLetsBoboInAndEndsNight() {
         Game game = new Game(() -> 1);
         game.startNight(1);
+        disableMimiAndZigEtZag(game);
         run(game, Bobo.ACTION_INTERVAL * 4);
         assertEquals(GameState.JUMPSCARE, game.getState());
         assertEquals("Bobo", game.getAttackerName());
@@ -63,6 +83,7 @@ class GameTest {
     void doorClosedAllNightSurvivesUntilSix() {
         Game game = new Game(() -> 1);
         game.startNight(1);
+        disableMimiAndZigEtZag(game);
         game.toggleLeftDoor();
         run(game, 400);
         assertEquals(GameState.WIN, game.getState());
@@ -73,6 +94,7 @@ class GameTest {
     void closingDoorInTimeRepelsBobo() {
         Game game = new Game(() -> 1);
         game.startNight(1);
+        disableMimiAndZigEtZag(game);
         run(game, Bobo.ACTION_INTERVAL * 3);
         assertEquals(Room.COULOIR_GAUCHE, game.getBobo().getRoom());
         game.toggleLeftDoor();
@@ -143,6 +165,7 @@ class GameTest {
         List<GameEvent.AnimatronicMoved> moves = new ArrayList<>();
         game.getEvents().subscribe(GameEvent.AnimatronicMoved.class, moves::add);
         game.startNight(1);
+        disableMimiAndZigEtZag(game);
         run(game, Bobo.ACTION_INTERVAL);
         assertEquals(List.of(new GameEvent.AnimatronicMoved("Bobo", Room.PISTE_CENTRALE, Room.GRADINS)), moves);
     }

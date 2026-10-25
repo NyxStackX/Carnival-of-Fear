@@ -32,4 +32,14 @@ class NightConfigTest {
         assertThrows(IllegalArgumentException.class, () -> new NightConfig(0, 3, 1.0));
         assertThrows(IllegalArgumentException.class, () -> new NightConfig(1, 3, 0.0));
     }
+
+    @Test
+    void newCharactersGetProgressivelyHigherAiLevels() {
+        assertEquals(1, NightConfig.forNight(1).mimiAiLevel());
+        assertEquals(1, NightConfig.forNight(1).zigEtZagAiLevel());
+        assertEquals(3, NightConfig.forNight(2).mimiAiLevel());
+        assertEquals(3, NightConfig.forNight(2).zigEtZagAiLevel());
+        assertEquals(12, NightConfig.forNight(5).mimiAiLevel());
+        assertEquals(13, NightConfig.forNight(5).zigEtZagAiLevel());
+    }
 }
