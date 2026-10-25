@@ -68,6 +68,21 @@ class GameTest {
     }
 
     @Test
+    void pauseAndResumeAreOnlyAvailableDuringAnActiveNight() {
+        Game game = new Game(() -> 20);
+        game.pause();
+        assertEquals(GameState.MENU, game.getState());
+
+        game.startNight(1);
+        game.pause();
+        assertEquals(GameState.PAUSED, game.getState());
+        game.resume();
+        assertEquals(GameState.PLAYING, game.getState());
+        game.resume();
+        assertEquals(GameState.PLAYING, game.getState());
+    }
+
+    @Test
     void openDoorLetsBoboInAndEndsNight() {
         Game game = new Game(() -> 1);
         game.startNight(1);

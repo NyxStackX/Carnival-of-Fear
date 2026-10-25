@@ -53,6 +53,30 @@ class GameLoopTest {
     }
 
     @Test
+    void pausedNightDoesNotAdvanceUntilResumed() {
+        AtomicInteger updates = new AtomicInteger();
+        loop.registerSystem((dt, ctx) -> updates.incrementAndGet());
+        loop.startNight();
+        loop.tick(1.0);
+        double elapsed = clock.getElapsedSeconds();
+        double energy = power.getEnergy();
+        int count = updates.get();
+
+        loop.pause();
+        loop.tick(10.0);
+        assertEquals(GameState.PAUSED, loop.getState());
+        assertEquals(elapsed, clock.getElapsedSeconds());
+        assertEquals(energy, power.getEnergy());
+        assertEquals(count, updates.get());
+
+        loop.resume();
+        loop.tick(1.0);
+        assertEquals(GameState.PLAYING, loop.getState());
+        assertEquals(elapsed + 1.0, clock.getElapsedSeconds());
+        assertEquals(count + 1, updates.get());
+    }
+
+    @Test
     void tickRejectsNegativeDelta() {
         loop.startNight();
         assertThrows(IllegalArgumentException.class, () -> loop.tick(-1.0));
