@@ -1,6 +1,7 @@
 package com.epitech.fnah.view;
 
 import com.epitech.fnah.config.GameConfig;
+import com.epitech.fnah.core.AchievementTracker;
 import com.epitech.fnah.core.Game;
 import com.epitech.fnah.core.GameEvent;
 import com.epitech.fnah.core.GameState;
@@ -50,11 +51,13 @@ public class GameApp extends Application {
 
         game = new Game();
         game.selectNight(config.getUnlockedNight());
+        new AchievementTracker(game.getEvents(), config);
         game.getEvents().subscribe(GameEvent.StateChanged.class, e -> {
             if (e.state() == GameState.WIN) {
                 onNightWon();
             }
         });
+        game.getEvents().subscribe(GameEvent.AchievementUnlocked.class, e -> saveProgress());
 
         Assets assets = Assets.load();
         SoundManager sound = new SoundManager(game);
@@ -65,7 +68,10 @@ public class GameApp extends Application {
         // Une touche maintenue ne compte qu'une fois : sans cela, la répétition
         // automatique du clavier ouvrirait et fermerait la porte en boucle.
         Set<KeyCode> held = EnumSet.noneOf(KeyCode.class);
-        scene.setOnKeyReleased(e -> held.remove(e.getCode()));
+        scene.setOnKeyReleased(e -> {
+            held.remove(e.getCode());
+            screens.onKeyReleased(e);
+        });
         scene.setOnKeyPressed(e -> {
             if (!held.add(e.getCode())) {
                 return;
@@ -76,7 +82,13 @@ public class GameApp extends Application {
                 screens.onKey(e);
             }
         });
-        stage.focusedProperty().addListener((obs, was, now) -> held.clear());
+        // Fenêtre qui perd le focus : les touches maintenues sont relâchées (lampes, manivelle)
+        stage.focusedProperty().addListener((obs, was, now) -> {
+            held.clear();
+            game.releaseControls();
+        });
+        canvas.setOnMousePressed(e -> screens.onMousePressed(e.getX(), e.getY()));
+        canvas.setOnMouseReleased(e -> screens.onMouseReleased(e.getX(), e.getY()));
         canvas.setOnMouseClicked(e -> screens.onClick(e.getX(), e.getY()));
         canvas.setOnMouseMoved(e -> screens.onMouseMove(e.getX(), e.getY()));
 
@@ -109,10 +121,13 @@ public class GameApp extends Application {
     }
 
     private void onNightWon() {
-        if (!game.hasNextNight()) {
-            return;
+        if (game.hasNextNight()) {
+            config.unlockNight(game.getCurrentNight() + 1);
+            saveProgress();
         }
-        config.unlockNight(game.getCurrentNight() + 1);
+    }
+
+    private void saveProgress() {
         try {
             config.save();
         } catch (IOException e) {

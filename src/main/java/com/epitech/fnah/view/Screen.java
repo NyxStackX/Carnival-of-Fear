@@ -39,6 +39,32 @@ interface Screen {
     }
 
     /**
+     * Réagit au relâchement d'une touche (commandes maintenues : lampes, manivelle).
+     *
+     * @param event touche relâchée
+     */
+    default void onKeyReleased(KeyEvent event) {
+    }
+
+    /**
+     * Réagit à l'appui sur le bouton de la souris (avant le clic).
+     *
+     * @param x abscisse
+     * @param y ordonnée
+     */
+    default void onMousePressed(double x, double y) {
+    }
+
+    /**
+     * Réagit au relâchement du bouton de la souris.
+     *
+     * @param x abscisse
+     * @param y ordonnée
+     */
+    default void onMouseReleased(double x, double y) {
+    }
+
+    /**
      * Réagit à un clic.
      *
      * @param x abscisse
