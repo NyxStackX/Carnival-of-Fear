@@ -24,6 +24,10 @@ Les deux musiques ont été fournies par l'équipe et converties en WAV.
 | `sfx/whisper.wav`, `sfx/child_laugh.wav` | Hallucinations (à partir de la nuit 3) |
 | `sfx/typewriter.wav`, `sfx/tape_hiss.wav` | Cassette du veilleur en début de nuit |
 | `sfx/honk.wav`, `sfx/crash_buzz.wav` | Easter eggs : nez de Bobo, faux plantage |
+| `sfx/door_creak.wav`, `sfx/cup_fall.wav`, `sfx/sting.wav` | Metteur en scène de la peur : porte qui grince, tasse qui tombe, coup après un silence |
+| `sfx/wind_loop.wav`, `sfx/fire_loop.wav`, `sfx/thud.wav` | Prologue : vent, incendie, coups sourds |
+| `sfx/zap.wav`, `sfx/dial_tick.wav`, `sfx/safe_open.wav`, `sfx/rustle.wav` | Fusibles, coffre, cachette sous le bureau |
+| `sfx/girl_1.wav` à `girl_4.wav`, `sfx/laugh_1.wav` à `laugh_4.wav` | Voix découpées dans les deux sons d'horreur fournis par l'équipe (licence à vérifier) |
 
 Pour changer une musique, la convertir en WAV et remplacer le fichier (le MP3 ne se lit
 pas de façon fiable sous Linux) :

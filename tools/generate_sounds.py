@@ -544,6 +544,111 @@ def honk():
     return reverb(nasal * env_adsr(len(t), 0.01, 0.05, 0.8, 0.08), 0.2)
 
 
+# ---------------------------------------------------------------- régie enrichie et introduction
+
+def door_creak():
+    """Porte qui grince lentement, au loin."""
+    seconds = 2.2
+    n = int(seconds * RATE)
+    t = t_axis(seconds)
+    f = 520 + 260 * np.sin(2 * np.pi * 0.35 * t) + 40 * np.sin(2 * np.pi * 7 * t)
+    phase = 2 * np.pi * np.cumsum(f) / RATE
+    # Frottement : impulsions irrégulières filtrées autour de la fréquence qui glisse
+    stick = (np.sin(phase) > 0.92).astype(float) * (0.6 + 0.4 * rng.random(n))
+    out = bandpass(stick, 300, 3500) + 0.15 * bandpass(noise(seconds), 800, 2500)
+    return reverb(out * env_adsr(n, 0.2, 0.0, 1.0, 0.5), 0.5, 2.0)
+
+
+def cup_fall():
+    """La tasse tombe et se brise sur le parquet."""
+    out = np.zeros(int(1.6 * RATE))
+    thud = lowpass(noise(0.15), 500) * exp_decay(int(0.15 * RATE), 0.03)
+    mix_at(out, thud, 0.0, 0.8)
+    for _ in range(14):
+        f = rng.uniform(2200, 6500)
+        t = t_axis(0.25)
+        shard = np.sin(2 * np.pi * f * t) * exp_decay(len(t), rng.uniform(0.02, 0.08))
+        mix_at(out, shard, 0.02 + rng.uniform(0, 0.35), rng.uniform(0.15, 0.4))
+    mix_at(out, highpass(noise(0.3), 2500) * exp_decay(int(0.3 * RATE), 0.05), 0.02, 0.5)
+    return reverb(out, 0.35, 1.4)
+
+
+def sting():
+    """Coup d'orchestre dissonant après un silence."""
+    seconds = 2.6
+    t = t_axis(seconds)
+    out = np.zeros(len(t))
+    for f in (110, 116.5, 155.6, 233.1, 246.9, 466.2):
+        saw = 2 * ((f * t) % 1) - 1
+        out += lowpass(saw, 3000) / 6
+    out += 1.5 * lowpass(noise(seconds), 200) * exp_decay(len(t), 0.3)
+    out = np.tanh(2 * out) * env_adsr(len(t), 0.005, 0.2, 0.5, 1.2)
+    return reverb(out, 0.5, 2.2)
+
+
+def wind_loop():
+    """Vent sous le chapiteau, qui siffle par moments."""
+    seconds = 8.0
+    t = t_axis(seconds)
+    gust = 0.55 + 0.45 * np.sin(2 * np.pi * t / seconds) * np.sin(2 * np.pi * 0.37 * t)
+    body = lowpass(noise(seconds), 500) * gust
+    whistle = bandpass(noise(seconds), 900, 1300) * (0.3 + 0.3 * np.sin(2 * np.pi * 0.21 * t)) * gust
+    return loopable(body + 0.5 * whistle, 1.5)
+
+
+def fire_loop():
+    """Crépitement d'incendie (introduction)."""
+    seconds = 5.0
+    out = 0.35 * lowpass(noise(seconds), 300)
+    for _ in range(420):
+        n = int(rng.uniform(0.003, 0.02) * RATE)
+        crack = highpass(noise(n / RATE), 1200)
+        crack = crack * exp_decay(len(crack), n / RATE / 3)
+        mix_at(out, crack, rng.uniform(0, seconds - 0.03), rng.uniform(0.1, 0.8))
+    return loopable(out, 0.8)
+
+
+def thud():
+    """Coup sourd et lourd (titres, coupures de journal)."""
+    n = int(1.5 * RATE)
+    t = t_axis(1.5)
+    f = 70 * np.exp(-t / 0.4) + 30
+    boom = np.sin(2 * np.pi * np.cumsum(f) / RATE) * exp_decay(n, 0.35)
+    return reverb(boom + 0.3 * lowpass(noise(1.5), 300) * exp_decay(n, 0.08), 0.4, 2.0)
+
+
+def zap():
+    """Surtension : arc électrique qui claque."""
+    seconds = 0.9
+    n = int(seconds * RATE)
+    t = t_axis(seconds)
+    buzz = np.sign(np.sin(2 * np.pi * 120 * t)) * (rng.random(n) > 0.4)
+    out = bandpass(buzz, 200, 6000) * exp_decay(n, 0.25) + highpass(noise(seconds), 3000) * exp_decay(n, 0.05)
+    return np.tanh(2 * out)
+
+
+def dial_tick():
+    """Cliquetis du cadran du coffre."""
+    n = int(0.06 * RATE)
+    return bandpass(noise(0.06), 2000, 7000) * exp_decay(n, 0.006) + 0.5 * np.sin(2 * np.pi * 1600 * t_axis(0.06)) * exp_decay(n, 0.01)
+
+
+def safe_open():
+    """Le coffre s'ouvre : déclic lourd puis gonds."""
+    out = np.zeros(int(2.0 * RATE))
+    mix_at(out, door_close()[:int(0.6 * RATE)], 0.0, 0.8)
+    mix_at(out, door_creak()[:int(1.4 * RATE)] * 0.6, 0.35, 0.7)
+    return out
+
+
+def rustle():
+    """Le joueur se glisse sous le bureau."""
+    seconds = 0.8
+    n = int(seconds * RATE)
+    return bandpass(noise(seconds), 600, 4000) * env_adsr(n, 0.08, 0.1, 0.6, 0.3) * (
+        0.6 + 0.4 * np.sin(2 * np.pi * 9 * t_axis(seconds)))
+
+
 # ---------------------------------------------------------------- main
 
 def main():
@@ -573,6 +678,11 @@ def main():
         ('light_buzz', light_buzz, 0.25), ('organ_loop', organ_loop, 0.7),
         ('crank', crank, 0.6), ('henry_melody', henry_melody, 0.75),
         ('crash_buzz', crash_buzz, 0.6), ('honk', honk, 0.8),
+        # Régie enrichie, metteur en scène de la peur et introduction
+        ('door_creak', door_creak, 0.7), ('cup_fall', cup_fall, 0.8), ('sting', sting, 0.95),
+        ('wind_loop', wind_loop, 0.5), ('fire_loop', fire_loop, 0.6), ('thud', thud, 0.95),
+        ('zap', zap, 0.8), ('dial_tick', dial_tick, 0.5), ('safe_open', safe_open, 0.8),
+        ('rustle', rustle, 0.5),
     ]:
         save(sfx, name, fn(), peak)
 
