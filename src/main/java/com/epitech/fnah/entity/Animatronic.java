@@ -93,7 +93,12 @@ public abstract class Animatronic implements Updatable {
         return false;
     }
 
-    /** Indique si ce clown est observé par la caméra de sa salle. */
+    /**
+     * Indique si ce clown est observé : un clown observé ne tente pas d'action.
+     *
+     * @param ctx état de la nuit
+     * @return {@code true} si le clown est observé (jamais, par défaut)
+     */
     protected boolean isObserved(GameContext ctx) {
         return false;
     }
@@ -207,6 +212,11 @@ public abstract class Animatronic implements Updatable {
         return level > 0 && dice.rollD20() <= level;
     }
 
+    /**
+     * Lance le dé à 20 faces du clown (pour ses choix aléatoires).
+     *
+     * @return résultat entre 1 et 20
+     */
     protected final int rollD20() {
         return dice.rollD20();
     }

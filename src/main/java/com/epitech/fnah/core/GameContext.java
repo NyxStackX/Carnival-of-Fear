@@ -67,7 +67,11 @@ public class GameContext {
         attackHandler.accept(attackerName);
     }
 
-    /** Publie un signal sonore ou visuel sans coupler la logique au rendu. */
+    /**
+     * Publie un signal sonore ou visuel sans coupler la logique au rendu.
+     *
+     * @param event événement à publier
+     */
     public void publish(GameEvent event) {
         eventPublisher.accept(Objects.requireNonNull(event, "event"));
     }

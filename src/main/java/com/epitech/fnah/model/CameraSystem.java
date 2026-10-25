@@ -76,7 +76,13 @@ public class CameraSystem implements PowerConsumer {
         return open && selected == room && !isDisabled(room);
     }
 
-    /** Disables a camera for the requested duration. */
+    /**
+     * Brouille une caméra pendant une durée donnée (farce de Zig et Zag).
+     *
+     * @param room            salle dont la caméra est brouillée
+     * @param durationSeconds durée du brouillage, en secondes
+     * @throws IllegalArgumentException si la salle n'a pas de caméra ou si la durée n'est pas positive
+     */
     public void disable(Room room, double durationSeconds) {
         Objects.requireNonNull(room, "room");
         if (!room.hasCamera()) {
@@ -88,17 +94,32 @@ public class CameraSystem implements PowerConsumer {
         disabledCameras.put(room, durationSeconds);
     }
 
-    /** Returns whether a camera is currently showing static. */
+    /**
+     * Indique si la caméra d'une salle est brouillée.
+     *
+     * @param room salle
+     * @return {@code true} si sa caméra n'affiche que de la neige
+     */
     public boolean isDisabled(Room room) {
         return disabledCameras.getOrDefault(room, 0.0) > 0;
     }
 
-    /** Returns how long a camera has been disabled. */
+    /**
+     * Renvoie le temps de brouillage restant d'une caméra.
+     *
+     * @param room salle
+     * @return secondes restantes, 0 si la caméra fonctionne
+     */
     public double getDisabledTimeRemaining(Room room) {
         return disabledCameras.getOrDefault(room, 0.0);
     }
 
-    /** Advances all camera interference timers. */
+    /**
+     * Fait avancer les minuteurs de brouillage.
+     *
+     * @param deltaSeconds temps écoulé, en secondes
+     * @throws IllegalArgumentException si le temps est négatif
+     */
     public void update(double deltaSeconds) {
         if (deltaSeconds < 0) {
             throw new IllegalArgumentException("deltaSeconds must be >= 0");
