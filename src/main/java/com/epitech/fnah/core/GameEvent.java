@@ -1,5 +1,6 @@
 package com.epitech.fnah.core;
 
+import com.epitech.fnah.config.Achievement;
 import com.epitech.fnah.model.Door;
 import com.epitech.fnah.model.Room;
 
@@ -63,5 +64,60 @@ public sealed interface GameEvent {
 
     /** Zig et Zag ont joué un faux klaxon. */
     record FakeHornPlayed() implements GameEvent {
+    }
+
+    /**
+     * Une nuit commence.
+     *
+     * @param night        numéro de la nuit
+     * @param custom       {@code true} pour la nuit personnalisée
+     * @param maxChallenge {@code true} si tous les clowns sont au niveau 20
+     */
+    record NightStarted(int night, boolean custom, boolean maxChallenge) implements GameEvent {
+    }
+
+    /**
+     * Une lampe de couloir s'est allumée ou éteinte.
+     *
+     * @param side côté de la lampe
+     * @param on   {@code true} si elle vient de s'allumer
+     */
+    record LightToggled(Door.Side side, boolean on) implements GameEvent {
+    }
+
+    /** L'énergie est tombée à 0 % : tout s'éteint. */
+    record PowerOut() implements GameEvent {
+    }
+
+    /**
+     * Henry commence ou arrête sa mélodie dans le noir.
+     *
+     * @param playing {@code true} quand la mélodie commence
+     */
+    record HenryMelody(boolean playing) implements GameEvent {
+    }
+
+    /**
+     * Le joueur prend ou lâche la manivelle de l'orgue.
+     *
+     * @param winding {@code true} quand il commence à tourner
+     */
+    record OrganWinding(boolean winding) implements GameEvent {
+    }
+
+    /**
+     * Pépin sort de sa boîte, ou y retourne.
+     *
+     * @param out {@code true} quand il sort
+     */
+    record PepinEscaped(boolean out) implements GameEvent {
+    }
+
+    /**
+     * Le joueur vient d'obtenir une étoile.
+     *
+     * @param achievement étoile obtenue
+     */
+    record AchievementUnlocked(Achievement achievement) implements GameEvent {
     }
 }

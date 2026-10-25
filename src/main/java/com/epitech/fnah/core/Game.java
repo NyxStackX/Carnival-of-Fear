@@ -1,15 +1,21 @@
 package com.epitech.fnah.core;
 
+import com.epitech.fnah.config.CustomNight;
 import com.epitech.fnah.config.NightConfig;
 import com.epitech.fnah.entity.Bobo;
 import com.epitech.fnah.entity.Dice;
+import com.epitech.fnah.entity.Henry;
 import com.epitech.fnah.entity.Mimi;
+import com.epitech.fnah.entity.Pepin;
 import com.epitech.fnah.entity.RandomDice;
 import com.epitech.fnah.entity.ZigEtZag;
+import com.epitech.fnah.model.Light;
 import com.epitech.fnah.model.MapGraph;
 import com.epitech.fnah.model.Office;
 import com.epitech.fnah.model.PowerSystem;
 import com.epitech.fnah.model.Room;
+
+import java.util.Objects;
 
 /**
  * Point d'entrée de la logique du jeu pour l'affichage (patron Facade).
@@ -28,9 +34,12 @@ public class Game {
     private final Bobo bobo;
     private final Mimi mimi;
     private final ZigEtZag zigEtZag;
+    private final Pepin pepin;
+    private final Henry henry;
     private final GameLoop loop;
 
     private int currentNight = 1;
+    private CustomNight customNight;
 
     /** Crée une partie avec un vrai hasard. */
     public Game() {
@@ -46,10 +55,14 @@ public class Game {
         this.bobo = new Bobo(0, dice);
         this.mimi = new Mimi(1, dice);
         this.zigEtZag = new ZigEtZag(1, dice);
+        this.pepin = new Pepin(0, dice);
+        this.henry = new Henry(dice);
         this.loop = new GameLoop(clock, power, office, map, events::publish);
         loop.registerSystem(bobo);
         loop.registerSystem(mimi);
         loop.registerSystem(zigEtZag);
+        loop.registerSystem(pepin);
+        loop.registerBlackoutSystem(henry);
 
         loop.onStateChange(state -> events.publish(new GameEvent.StateChanged(state)));
         bobo.onMove((from, to) -> events.publish(new GameEvent.AnimatronicMoved(bobo.getName(), from, to)));
@@ -57,6 +70,8 @@ public class Game {
         zigEtZag.onMove((from, to) -> events.publish(new GameEvent.AnimatronicMoved(zigEtZag.getName(), from, to)));
         office.getLeftDoor().onToggle(door -> events.publish(new GameEvent.DoorToggled(door.getSide(), door.isClosed())));
         office.getRightDoor().onToggle(door -> events.publish(new GameEvent.DoorToggled(door.getSide(), door.isClosed())));
+        office.getLeftLight().onToggle(light -> events.publish(new GameEvent.LightToggled(light.getSide(), light.isOn())));
+        office.getRightLight().onToggle(light -> events.publish(new GameEvent.LightToggled(light.getSide(), light.isOn())));
         clock.onHourChange(hour -> events.publish(new GameEvent.HourChanged(hour)));
         office.getCameras().onTabletToggle(cams -> events.publish(new GameEvent.TabletToggled(cams.isOpen(), cams.getSelected())));
         office.getCameras().onCameraSelected(cams -> events.publish(new GameEvent.CameraSelected(cams.getSelected())));
@@ -80,16 +95,60 @@ public class Game {
     public void startNight(int night) {
         NightConfig config = NightConfig.forNight(night);
         currentNight = night;
+        customNight = null;
         bobo.setBaseAiLevel(config.boboAiLevel());
         mimi.setBaseAiLevel(config.mimiAiLevel());
         zigEtZag.setBaseAiLevel(config.zigEtZagAiLevel());
+        pepin.setBaseAiLevel(config.pepinAiLevel());
         power.setEnergyMultiplier(config.energyMultiplier());
         loop.startNight();
+        events.publish(new GameEvent.NightStarted(night, false, false));
     }
 
-    /** Relance la nuit sélectionnée depuis le début. */
+    /**
+     * Lance la nuit personnalisée, avec le niveau choisi pour chaque clown.
+     * Elle compte comme une nuit après la dernière : il n'y a pas de nuit suivante.
+     *
+     * @param custom niveaux des clowns
+     */
+    public void startCustomNight(CustomNight custom) {
+        customNight = Objects.requireNonNull(custom, "custom");
+        currentNight = NightConfig.LAST_NIGHT;
+        bobo.setBaseAiLevel(custom.bobo());
+        mimi.setBaseAiLevel(custom.mimi());
+        zigEtZag.setBaseAiLevel(custom.zigEtZag());
+        pepin.setBaseAiLevel(custom.pepin());
+        power.setEnergyMultiplier(CustomNight.ENERGY_MULTIPLIER);
+        loop.startNight();
+        events.publish(new GameEvent.NightStarted(currentNight, true, custom.isMaxChallenge()));
+    }
+
+    /** Relance la nuit en cours (ou la nuit personnalisée) depuis le début. */
     public void restartNight() {
-        startNight(currentNight);
+        if (customNight != null) {
+            startCustomNight(customNight);
+        } else {
+            startNight(currentNight);
+        }
+    }
+
+    /**
+     * Indique si la nuit en cours est la nuit personnalisée.
+     *
+     * @return {@code true} pour la nuit personnalisée
+     */
+    public boolean isCustomNight() {
+        return customNight != null;
+    }
+
+    /**
+     * Indique si le veilleur a des hallucinations cette nuit (nuit 3 et suivantes,
+     * et nuit personnalisée).
+     *
+     * @return {@code true} si les hallucinations sont actives
+     */
+    public boolean hasHallucinations() {
+        return customNight != null || NightConfig.forNight(currentNight).hasHallucinations();
     }
 
     /**
@@ -98,7 +157,28 @@ public class Game {
      * @return {@code true} s'il reste une nuit après la nuit en cours
      */
     public boolean hasNextNight() {
-        return currentNight < NightConfig.LAST_NIGHT;
+        return customNight == null && currentNight < NightConfig.LAST_NIGHT;
+    }
+
+    /**
+     * Indique si la fin de l'histoire peut être jouée : la nuit 5 vient d'être gagnée.
+     *
+     * @return {@code true} après la victoire de la nuit 5
+     */
+    public boolean canPlayEnding() {
+        return loop.getState() == GameState.WIN && customNight == null && currentNight == NightConfig.LAST_NIGHT;
+    }
+
+    /**
+     * Passe à la fin de l'histoire (journal puis générique).
+     *
+     * @throws IllegalStateException si la nuit 5 n'a pas été gagnée juste avant
+     */
+    public void playEnding() {
+        if (!canPlayEnding()) {
+            throw new IllegalStateException("ending only after winning night " + NightConfig.LAST_NIGHT);
+        }
+        loop.setState(GameState.ENDING);
     }
 
     /**
@@ -133,23 +213,82 @@ public class Game {
      * ou si la tablette est levée : le joueur doit la baisser pour atteindre la porte.
      */
     public void toggleLeftDoor() {
-        if (loop.getState() == GameState.PLAYING && !office.getCameras().isOpen()) {
+        if (canReachDesk()) {
             office.getLeftDoor().toggle();
         }
     }
 
-    /** Toggles the right door when the player can reach its controls. */
+    /** Ouvre ou ferme la porte droite. Mêmes conditions que la porte gauche. */
     public void toggleRightDoor() {
-        if (loop.getState() == GameState.PLAYING && !office.getCameras().isOpen()) {
+        if (canReachDesk()) {
             office.getRightDoor().toggle();
         }
     }
 
-    /** Lève ou baisse la tablette des caméras. Sans effet si aucune nuit n'est en cours. */
+    /**
+     * Allume ou éteint la lampe du couloir gauche. Pour allumer, il faut une nuit
+     * en cours, la tablette baissée et du courant. Éteindre est toujours possible.
+     *
+     * @param on {@code true} pour allumer (touche maintenue)
+     */
+    public void setLeftLight(boolean on) {
+        setLight(office.getLeftLight(), on);
+    }
+
+    /**
+     * Allume ou éteint la lampe du couloir droit. Mêmes conditions que {@link #setLeftLight(boolean)}.
+     *
+     * @param on {@code true} pour allumer (touche maintenue)
+     */
+    public void setRightLight(boolean on) {
+        setLight(office.getRightLight(), on);
+    }
+
+    private void setLight(Light light, boolean on) {
+        light.setOn(on && canReachDesk());
+    }
+
+    /**
+     * Prend ou lâche la manivelle de l'orgue. Il faut regarder la caméra 8 pour la prendre.
+     *
+     * @param winding {@code true} pour tourner la manivelle (touche maintenue)
+     */
+    public void setWinding(boolean winding) {
+        boolean can = winding && canUseCameras() && office.getCameras().getSelected() == Pepin.START_ROOM;
+        if (office.getOrgan().isWinding() != can) {
+            office.getOrgan().setWinding(can);
+            events.publish(new GameEvent.OrganWinding(can));
+        }
+    }
+
+    /** Relâche toutes les commandes maintenues (lampes, manivelle), par exemple si la fenêtre perd le focus. */
+    public void releaseControls() {
+        setLeftLight(false);
+        setRightLight(false);
+        setWinding(false);
+    }
+
+    /** Lève ou baisse la tablette des caméras. Sans effet si aucune nuit n'est en cours ou sans courant. */
     public void toggleTablet() {
-        if (loop.getState() == GameState.PLAYING) {
+        if (loop.getState() == GameState.PLAYING && !power.isPowerOut()) {
+            releaseControls();
             office.getCameras().toggleTablet();
         }
+    }
+
+    /**
+     * Indique si un danger est tout proche : un clown juste derrière une porte,
+     * Pépin hors de sa boîte ou Henry dans le noir. Sert au battement de cœur.
+     *
+     * @return {@code true} si un danger est tout proche
+     */
+    public boolean isThreatNear() {
+        return bobo.isAtDoor() || mimi.getRoom() == Room.COULOIR_DROIT
+                || pepin.isOut() || henry.isPlayingMelody();
+    }
+
+    private boolean canReachDesk() {
+        return loop.getState() == GameState.PLAYING && !office.getCameras().isOpen() && !power.isPowerOut();
     }
 
     /**
@@ -161,6 +300,7 @@ public class Game {
     public void selectCamera(int number) {
         if (canUseCameras()) {
             Room.fromCameraNumber(number).ifPresent(office.getCameras()::select);
+            releaseCrankIfAway();
         }
     }
 
@@ -172,6 +312,13 @@ public class Game {
     public void cycleCamera(int step) {
         if (canUseCameras()) {
             office.getCameras().cycle(step);
+            releaseCrankIfAway();
+        }
+    }
+
+    private void releaseCrankIfAway() {
+        if (office.getCameras().getSelected() != Pepin.START_ROOM) {
+            setWinding(false);
         }
     }
 
@@ -251,10 +398,32 @@ public class Game {
      */
     public Bobo getBobo() { return bobo; }
 
-    /** Renvoie Mimi. */
+    /**
+     * Renvoie Mimi.
+     *
+     * @return Mimi
+     */
     public Mimi getMimi() { return mimi; }
 
-    /** Renvoie Zig et Zag. */
+    /**
+     * Renvoie Zig et Zag.
+     *
+     * @return Zig et Zag
+     */
     public ZigEtZag getZigEtZag() { return zigEtZag; }
+
+    /**
+     * Renvoie Pépin.
+     *
+     * @return Pépin
+     */
+    public Pepin getPepin() { return pepin; }
+
+    /**
+     * Renvoie Henry.
+     *
+     * @return Henry
+     */
+    public Henry getHenry() { return henry; }
 
 }

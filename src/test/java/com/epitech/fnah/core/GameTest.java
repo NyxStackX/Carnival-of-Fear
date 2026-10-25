@@ -1,7 +1,11 @@
 package com.epitech.fnah.core;
 
+import com.epitech.fnah.config.CustomNight;
 import com.epitech.fnah.config.NightConfig;
 import com.epitech.fnah.entity.Bobo;
+import com.epitech.fnah.entity.Henry;
+import com.epitech.fnah.entity.Pepin;
+import com.epitech.fnah.model.BarrelOrgan;
 import com.epitech.fnah.model.CameraSystem;
 import com.epitech.fnah.model.Door;
 import com.epitech.fnah.model.Room;
@@ -288,5 +292,217 @@ class GameTest {
         game.restartNight();
         assertFalse(game.getOffice().getCameras().isOpen());
         assertEquals(CameraSystem.DEFAULT_CAMERA, game.getOffice().getCameras().getSelected());
+    }
+
+    // ------------------------------------------------------------------ version finale
+
+    private static Game quietGame(int night) {
+        Game game = new Game(() -> 1);
+        game.startNight(night);
+        game.getBobo().setBaseAiLevel(0);
+        disableMimiAndZigEtZag(game);
+        game.getPepin().setBaseAiLevel(0);
+        return game;
+    }
+
+    @Test
+    void lightsOnlyWorkFromTheDesk() {
+        Game game = quietGame(1);
+        game.setLeftLight(true);
+        game.setRightLight(true);
+        assertTrue(game.getOffice().getLeftLight().isOn());
+        assertTrue(game.getOffice().getRightLight().isOn());
+        game.setLeftLight(false);
+        assertFalse(game.getOffice().getLeftLight().isOn());
+
+        game.toggleTablet();
+        assertFalse(game.getOffice().getRightLight().isOn());
+        game.setLeftLight(true);
+        assertFalse(game.getOffice().getLeftLight().isOn());
+    }
+
+    @Test
+    void lightsNeedANightInProgress() {
+        Game game = new Game();
+        game.setLeftLight(true);
+        assertFalse(game.getOffice().getLeftLight().isOn());
+    }
+
+    @Test
+    void lightToggleIsPublished() {
+        Game game = quietGame(1);
+        List<GameEvent.LightToggled> seen = new ArrayList<>();
+        game.getEvents().subscribe(GameEvent.LightToggled.class, seen::add);
+        game.setRightLight(true);
+        game.setRightLight(false);
+        assertEquals(List.of(new GameEvent.LightToggled(Door.Side.RIGHT, true),
+                new GameEvent.LightToggled(Door.Side.RIGHT, false)), seen);
+    }
+
+    @Test
+    void crankOnlyWorksOnCameraEight() {
+        Game game = quietGame(2);
+        List<GameEvent.OrganWinding> seen = new ArrayList<>();
+        game.getEvents().subscribe(GameEvent.OrganWinding.class, seen::add);
+        game.setWinding(true);
+        assertFalse(game.getOffice().getOrgan().isWinding());
+        game.toggleTablet();
+        game.setWinding(true);
+        assertFalse(game.getOffice().getOrgan().isWinding());
+        game.selectCamera(Pepin.START_ROOM.getCameraNumber());
+        game.setWinding(true);
+        assertTrue(game.getOffice().getOrgan().isWinding());
+        game.cycleCamera(1);
+        assertFalse(game.getOffice().getOrgan().isWinding());
+        assertEquals(List.of(new GameEvent.OrganWinding(true), new GameEvent.OrganWinding(false)), seen);
+    }
+
+    @Test
+    void releaseControlsLetsGoOfEverything() {
+        Game game = quietGame(2);
+        game.setLeftLight(true);
+        game.releaseControls();
+        assertFalse(game.getOffice().getLeftLight().isOn());
+        game.toggleTablet();
+        game.selectCamera(8);
+        game.setWinding(true);
+        game.releaseControls();
+        assertFalse(game.getOffice().getOrgan().isWinding());
+    }
+
+    @Test
+    void neglectedOrganLetsPepinOut() {
+        Game game = quietGame(2);
+        game.getPepin().setBaseAiLevel(20);
+        run(game, 120);
+        assertEquals(GameState.JUMPSCARE, game.getState());
+        assertEquals(Pepin.NAME, game.getAttackerName());
+    }
+
+    @Test
+    void windingTheOrganKeepsPepinInside() {
+        Game game = quietGame(2);
+        game.getPepin().setBaseAiLevel(20);
+        game.toggleTablet();
+        game.selectCamera(8);
+        game.setWinding(true);
+        run(game, 120);
+        assertEquals(GameState.PLAYING, game.getState());
+        assertEquals(BarrelOrgan.MAX_CHARGE, game.getOffice().getOrgan().getCharge());
+    }
+
+    @Test
+    void blackoutLocksTheControlsThenHenryAttacks() {
+        Game game = quietGame(1);
+        List<GameEvent> seen = new ArrayList<>();
+        game.getEvents().subscribe(GameEvent.PowerOut.class, seen::add);
+        game.getEvents().subscribe(GameEvent.HenryMelody.class, seen::add);
+        game.getPower().setEnergyMultiplier(500);
+        game.tick(5);
+        assertTrue(game.getPower().isPowerOut());
+        assertEquals(GameState.PLAYING, game.getState());
+
+        game.toggleLeftDoor();
+        game.toggleRightDoor();
+        game.toggleTablet();
+        game.setLeftLight(true);
+        assertFalse(game.getOffice().getLeftDoor().isClosed());
+        assertFalse(game.getOffice().getRightDoor().isClosed());
+        assertFalse(game.getOffice().getCameras().isOpen());
+        assertFalse(game.getOffice().getLeftLight().isOn());
+
+        run(game, Henry.DARK_BASE + Henry.SECONDS_PER_ROLL + 1);
+        assertTrue(game.getHenry().isPlayingMelody());
+        assertTrue(game.isThreatNear());
+        run(game, Henry.MELODY_BASE + Henry.SECONDS_PER_ROLL + 1);
+        assertEquals(GameState.JUMPSCARE, game.getState());
+        assertEquals(Henry.NAME, game.getAttackerName());
+        assertEquals(List.of(new GameEvent.PowerOut(), new GameEvent.HenryMelody(true),
+                new GameEvent.HenryMelody(false)), seen);
+    }
+
+    @Test
+    void sixAmSavesYouFromHenry() {
+        Game game = quietGame(1);
+        game.tick(GameClock.SECONDS_PER_HOUR * 6 - 3);
+        game.getPower().setEnergyMultiplier(10_000);
+        game.tick(1);
+        assertTrue(game.getPower().isPowerOut());
+        run(game, 10);
+        assertEquals(GameState.WIN, game.getState());
+    }
+
+    @Test
+    void threatNearFollowsTheClowns() {
+        Game game = new Game(() -> 1);
+        game.startNight(5);
+        disableMimiAndZigEtZag(game);
+        game.getPepin().setBaseAiLevel(0);
+        assertFalse(game.isThreatNear());
+        run(game, Bobo.ACTION_INTERVAL * 3);
+        assertTrue(game.getBobo().isAtDoor());
+        assertTrue(game.isThreatNear());
+    }
+
+    @Test
+    void customNightUsesChosenLevels() {
+        Game game = new Game(() -> 20);
+        List<GameEvent.NightStarted> seen = new ArrayList<>();
+        game.getEvents().subscribe(GameEvent.NightStarted.class, seen::add);
+        game.startCustomNight(new CustomNight(1, 2, 3, 4));
+        assertTrue(game.isCustomNight());
+        assertTrue(game.hasHallucinations());
+        assertFalse(game.hasNextNight());
+        assertEquals(1, game.getBobo().getBaseAiLevel());
+        assertEquals(2, game.getMimi().getBaseAiLevel());
+        assertEquals(3, game.getZigEtZag().getBaseAiLevel());
+        assertEquals(4, game.getPepin().getBaseAiLevel());
+        assertEquals(List.of(new GameEvent.NightStarted(NightConfig.LAST_NIGHT, true, false)), seen);
+
+        game.getBobo().setBaseAiLevel(15);
+        game.restartNight();
+        assertTrue(game.isCustomNight());
+        assertEquals(1, game.getBobo().getBaseAiLevel());
+
+        game.startNight(1);
+        assertFalse(game.isCustomNight());
+        assertEquals(0, game.getPepin().getBaseAiLevel());
+        assertThrows(NullPointerException.class, () -> game.startCustomNight(null));
+    }
+
+    @Test
+    void hallucinationsFollowTheNight() {
+        Game game = new Game(() -> 1);
+        game.startNight(2);
+        assertFalse(game.hasHallucinations());
+        game.startNight(3);
+        assertTrue(game.hasHallucinations());
+    }
+
+    @Test
+    void endingOnlyAfterWinningNightFive() {
+        Game game = quietGame(4);
+        assertFalse(game.canPlayEnding());
+        assertThrows(IllegalStateException.class, game::playEnding);
+        game.tick(400);
+        assertEquals(GameState.WIN, game.getState());
+        assertFalse(game.canPlayEnding());
+
+        Game last = quietGame(NightConfig.LAST_NIGHT);
+        last.tick(400);
+        assertTrue(last.canPlayEnding());
+        last.playEnding();
+        assertEquals(GameState.ENDING, last.getState());
+        last.returnToMenu();
+        assertEquals(GameState.MENU, last.getState());
+    }
+
+    @Test
+    void customNightHasNoEnding() {
+        Game game = new Game(() -> 1);
+        game.startCustomNight(new CustomNight(0, 0, 0, 0));
+        game.tick(400);
+        assertEquals(GameState.WIN, game.getState());
+        assertFalse(game.canPlayEnding());
     }
 }

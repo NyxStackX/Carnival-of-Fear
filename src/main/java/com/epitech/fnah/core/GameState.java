@@ -17,5 +17,7 @@ public enum GameState {
     /** Nuit perdue. */
     GAME_OVER,
     /** 06:00 atteint : nuit gagnée. */
-    WIN
+    WIN,
+    /** Fin de l'histoire après la nuit 5 : journal du lendemain, puis générique. */
+    ENDING
 }
