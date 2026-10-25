@@ -51,10 +51,24 @@ public final class GameLoop {
      * @param map    plan du chapiteau
      */
     public GameLoop(GameClock clock, PowerSystem power, Office office, MapGraph map) {
+        this(clock, power, office, map, event -> { });
+    }
+
+    /**
+     * Crée une boucle qui transfère aussi les signaux des clowns au canal d'événements.
+     *
+     * @param clock horloge de la nuit
+     * @param power système d'énergie
+     * @param office régie
+     * @param map plan du chapiteau
+     * @param eventPublisher diffuseur d'événements
+     */
+    public GameLoop(GameClock clock, PowerSystem power, Office office, MapGraph map,
+                    Consumer<GameEvent> eventPublisher) {
         this.clock = clock;
         this.power = power;
         this.office = office;
-        this.context = new GameContext(clock, power, office, map, this::triggerJumpscare);
+        this.context = new GameContext(clock, power, office, map, this::triggerJumpscare, eventPublisher);
         power.addConsumer(office);
         power.onPowerOut(p -> setState(GameState.GAME_OVER));
     }
@@ -104,6 +118,7 @@ public final class GameLoop {
 
         clock.update(deltaSeconds);
         power.update(deltaSeconds);
+        office.getCameras().update(deltaSeconds);
         if (state != GameState.PLAYING) {
             return;
         }

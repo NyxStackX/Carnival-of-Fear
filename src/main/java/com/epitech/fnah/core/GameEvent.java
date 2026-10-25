@@ -60,4 +60,8 @@ public sealed interface GameEvent {
      */
     record CameraSelected(Room camera) implements GameEvent {
     }
+
+    /** Zig et Zag ont joué un faux klaxon. */
+    record FakeHornPlayed() implements GameEvent {
+    }
 }

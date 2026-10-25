@@ -3,7 +3,9 @@ package com.epitech.fnah.core;
 import com.epitech.fnah.config.NightConfig;
 import com.epitech.fnah.entity.Bobo;
 import com.epitech.fnah.entity.Dice;
+import com.epitech.fnah.entity.Mimi;
 import com.epitech.fnah.entity.RandomDice;
+import com.epitech.fnah.entity.ZigEtZag;
 import com.epitech.fnah.model.MapGraph;
 import com.epitech.fnah.model.Office;
 import com.epitech.fnah.model.PowerSystem;
@@ -12,7 +14,7 @@ import com.epitech.fnah.model.Room;
 /**
  * Point d'entrée de la logique du jeu pour l'affichage (patron Facade).
  *
- * <p>Crée et relie l'horloge, l'énergie, la régie, le plan, Bobo et la boucle,
+ * <p>Crée et relie l'horloge, l'énergie, la régie, le plan et les clowns,
  * gère l'enchaînement des nuits, et publie ce qui se passe sur l'{@link EventBus}.
  * L'affichage n'a besoin que de cette classe.</p>
  */
@@ -24,6 +26,8 @@ public class Game {
     private final MapGraph map = MapGraph.circus();
     private final EventBus events = new EventBus();
     private final Bobo bobo;
+    private final Mimi mimi;
+    private final ZigEtZag zigEtZag;
     private final GameLoop loop;
 
     private int currentNight = 1;
@@ -40,12 +44,19 @@ public class Game {
      */
     public Game(Dice dice) {
         this.bobo = new Bobo(0, dice);
-        this.loop = new GameLoop(clock, power, office, map);
+        this.mimi = new Mimi(1, dice);
+        this.zigEtZag = new ZigEtZag(1, dice);
+        this.loop = new GameLoop(clock, power, office, map, events::publish);
         loop.registerSystem(bobo);
+        loop.registerSystem(mimi);
+        loop.registerSystem(zigEtZag);
 
         loop.onStateChange(state -> events.publish(new GameEvent.StateChanged(state)));
         bobo.onMove((from, to) -> events.publish(new GameEvent.AnimatronicMoved(bobo.getName(), from, to)));
+        mimi.onMove((from, to) -> events.publish(new GameEvent.AnimatronicMoved(mimi.getName(), from, to)));
+        zigEtZag.onMove((from, to) -> events.publish(new GameEvent.AnimatronicMoved(zigEtZag.getName(), from, to)));
         office.getLeftDoor().onToggle(door -> events.publish(new GameEvent.DoorToggled(door.getSide(), door.isClosed())));
+        office.getRightDoor().onToggle(door -> events.publish(new GameEvent.DoorToggled(door.getSide(), door.isClosed())));
         clock.onHourChange(hour -> events.publish(new GameEvent.HourChanged(hour)));
         office.getCameras().onTabletToggle(cams -> events.publish(new GameEvent.TabletToggled(cams.isOpen(), cams.getSelected())));
         office.getCameras().onCameraSelected(cams -> events.publish(new GameEvent.CameraSelected(cams.getSelected())));
@@ -70,6 +81,8 @@ public class Game {
         NightConfig config = NightConfig.forNight(night);
         currentNight = night;
         bobo.setBaseAiLevel(config.boboAiLevel());
+        mimi.setBaseAiLevel(config.mimiAiLevel());
+        zigEtZag.setBaseAiLevel(config.zigEtZagAiLevel());
         power.setEnergyMultiplier(config.energyMultiplier());
         loop.startNight();
     }
@@ -112,6 +125,13 @@ public class Game {
     public void toggleLeftDoor() {
         if (loop.getState() == GameState.PLAYING && !office.getCameras().isOpen()) {
             office.getLeftDoor().toggle();
+        }
+    }
+
+    /** Toggles the right door when the player can reach its controls. */
+    public void toggleRightDoor() {
+        if (loop.getState() == GameState.PLAYING && !office.getCameras().isOpen()) {
+            office.getRightDoor().toggle();
         }
     }
 
@@ -215,9 +235,16 @@ public class Game {
     public MapGraph getMap() { return map; }
 
     /**
-     * Renvoie Bobo, le seul clown actif pour l'instant.
+     * Renvoie Bobo.
      *
      * @return Bobo
      */
     public Bobo getBobo() { return bobo; }
+
+    /** Renvoie Mimi. */
+    public Mimi getMimi() { return mimi; }
+
+    /** Renvoie Zig et Zag. */
+    public ZigEtZag getZigEtZag() { return zigEtZag; }
+
 }

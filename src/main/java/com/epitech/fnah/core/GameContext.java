@@ -22,6 +22,7 @@ public class GameContext {
     public final MapGraph map;
 
     private final Consumer<String> attackHandler;
+    private final Consumer<GameEvent> eventPublisher;
 
     /**
      * Regroupe l'état de la nuit.
@@ -34,11 +35,27 @@ public class GameContext {
      */
     public GameContext(GameClock clock, PowerSystem power, Office office, MapGraph map,
                        Consumer<String> attackHandler) {
+        this(clock, power, office, map, attackHandler, event -> { });
+    }
+
+    /**
+     * Regroupe l'état de la nuit et le diffuseur des signaux sans couplage au rendu.
+     *
+     * @param clock horloge
+     * @param power système d'énergie
+     * @param office régie
+     * @param map plan du chapiteau
+     * @param attackHandler gestionnaire d'attaque
+     * @param eventPublisher diffuseur d'événements
+     */
+    public GameContext(GameClock clock, PowerSystem power, Office office, MapGraph map,
+                       Consumer<String> attackHandler, Consumer<GameEvent> eventPublisher) {
         this.clock = Objects.requireNonNull(clock, "clock");
         this.power = Objects.requireNonNull(power, "power");
         this.office = Objects.requireNonNull(office, "office");
         this.map = Objects.requireNonNull(map, "map");
         this.attackHandler = Objects.requireNonNull(attackHandler, "attackHandler");
+        this.eventPublisher = Objects.requireNonNull(eventPublisher, "eventPublisher");
     }
 
     /**
@@ -48,5 +65,10 @@ public class GameContext {
      */
     public void attackPlayer(String attackerName) {
         attackHandler.accept(attackerName);
+    }
+
+    /** Publie un signal sonore ou visuel sans coupler la logique au rendu. */
+    public void publish(GameEvent event) {
+        eventPublisher.accept(Objects.requireNonNull(event, "event"));
     }
 }
