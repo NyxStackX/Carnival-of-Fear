@@ -1,7 +1,8 @@
 package com.epitech.fnah.config;
 
 /**
- * Réglages d'une nuit. Les valeurs suivent le GDD (section 7) pour Bobo.
+ * Réglages d'une nuit. Les valeurs de Bobo suivent le GDD (section 7) ;
+ * Mimi et Zig et Zag gagnent progressivement en activité.
  *
  * @param number           numéro de la nuit (1 à {@value #LAST_NIGHT})
  * @param boboAiLevel      niveau d'IA de départ de Bobo
@@ -42,5 +43,27 @@ public record NightConfig(int number, int boboAiLevel, double energyMultiplier) 
             throw new IllegalArgumentException("night must be between 1 and " + LAST_NIGHT);
         }
         return NIGHTS[night - 1];
+    }
+
+    /** Niveau d'IA de départ de Mimi pour cette nuit. */
+    public int mimiAiLevel() {
+        return switch (number) {
+            case 1 -> 1;
+            case 2 -> 3;
+            case 3 -> 5;
+            case 4 -> 8;
+            default -> 12;
+        };
+    }
+
+    /** Niveau d'IA de départ de Zig et Zag pour cette nuit. */
+    public int zigEtZagAiLevel() {
+        return switch (number) {
+            case 1 -> 1;
+            case 2 -> 3;
+            case 3 -> 6;
+            case 4 -> 9;
+            default -> 13;
+        };
     }
 }
