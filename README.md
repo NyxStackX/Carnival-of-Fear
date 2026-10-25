@@ -4,14 +4,16 @@ Survival horror en Java (projet Epitech 2D GAME). Le joueur est veilleur de nuit
 
 ## État actuel
 
-Première version jouable : un ennemi, une mécanique.
+Version jouable avec un ennemi et deux mécaniques.
 
 - **Bobo** avance vers la porte gauche en suivant le plus court chemin dans le plan du chapiteau.
 - **La porte gauche** le repousse quand elle est fermée, mais consomme de l'énergie.
+- **La tablette des caméras** montre les 8 salles du chapiteau. Elle consomme de l'énergie et, tant qu'elle est levée, la porte est hors de portée.
 - Une nuit dure 6 minutes réelles. Les nuits 1 à 5 rendent Bobo de plus en plus actif.
 - La progression (nuits débloquées) est sauvegardée entre deux parties.
+- Une musique pour le menu, une ambiance pour la nuit, coupées au jumpscare (fichiers à déposer dans `src/main/resources/audio/`, voir le `LISEZMOI.md` du dossier).
 
-Prochaines étapes : lumière de couloir, caméras, puis Mimi (voir le GDD).
+Prochaines étapes : lumière du couloir gauche, sprites de la régie et de Bobo, puis Mimi (voir le GDD).
 
 ## Lancer le jeu
 
@@ -27,10 +29,13 @@ La progression est enregistrée dans `~/.cirque-malvaux/config.properties`. Supp
 
 | Action | Touche |
 |---|---|
-| Ouvrir / fermer la porte gauche | `Q` ou clic sur le bouton PORTE |
-| Choisir la nuit (menu) | `Gauche` / `Droite` |
+| Ouvrir / fermer la porte gauche | `Q` ou clic sur le bouton PORTE (tablette baissée) |
+| Lever / baisser la tablette | `Espace` ou clic sur la barre CAMÉRAS |
+| Choisir une caméra | `1` à `8`, `Gauche` / `Droite`, ou clic sur le plan |
+| Choisir la nuit (menu) | `Gauche` / `Droite` dans le menu |
 | Commencer, rejouer, nuit suivante | `Entrée` |
 | Retour au menu | `Échap` |
+| Couper / remettre le son | `M` |
 | Accélérer le temps x10 (test) | `F2` |
 
 ## Qualité
@@ -52,10 +57,12 @@ com.epitech.fnah
 ├── Main.java          Lanceur
 ├── config/            NightConfig (réglages par nuit), GameConfig (progression sauvegardée)
 ├── core/              Game (façade), GameLoop, GameClock, GameState, EventBus, GameEvent
-├── model/             PowerSystem, Door, Office (régie), Room, MapGraph (plan + plus court chemin)
+├── model/             PowerSystem, Door, CameraSystem (tablette), Office (régie), Room, MapGraph (plan + plus court chemin)
 ├── entity/            Animatronic (base des clowns), Bobo, Dice (hasard remplaçable en test)
-└── view/              GameApp (fenêtre, entrées), GameRenderer (dessin)
+└── view/              GameApp (fenêtre, entrées), GameRenderer (dessin), CameraImages, AudioManager (musiques)
 ```
+
+Images : `src/main/resources/images/cameras/<salle>.jpg` (1280x720), une par salle filmée, nommée d'après la constante de `Room` en minuscules (ex. `couloir_gauche.jpg`).
 
 Règles à respecter :
 
@@ -78,3 +85,9 @@ Règles à respecter :
 2. Ajouter son niveau d'IA dans `NightConfig`.
 3. L'enregistrer dans `Game` (`loop.registerSystem(...)`) et publier ses déplacements sur l'`EventBus`.
 4. Écrire ses tests avec un `Dice` fixe, sur le modèle de `BoboTest`.
+
+## Crédits
+
+Images des caméras : source et licence à compléter avant la mise en ligne publique.
+
+Musiques (`menu`, `nuit`) : titre, auteur et licence à compléter.

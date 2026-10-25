@@ -10,6 +10,7 @@ import javafx.application.Platform;
 import javafx.scene.Scene;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.StackPane;
 import javafx.scene.paint.Color;
 import javafx.stage.Stage;
@@ -19,7 +20,7 @@ import java.io.IOException;
 /**
  * Fenêtre du jeu : relie le clavier et la souris à {@link Game}, fait tourner
  * la boucle à pas fixe (60 ticks par seconde), demande l'affichage à
- * {@link GameRenderer} et sauvegarde la progression.
+ * {@link GameRenderer}, lance la musique ({@link AudioManager}) et sauvegarde la progression.
  */
 public class GameApp extends Application {
 
@@ -35,6 +36,7 @@ public class GameApp extends Application {
     private Game game;
     private GameConfig config;
     private GameRenderer renderer;
+    private AudioManager audio;
     private double timeScale = 1.0;
 
     /** Constructeur appelé par JavaFX au lancement. */
@@ -60,14 +62,11 @@ public class GameApp extends Application {
 
         Canvas canvas = new Canvas(WIDTH, HEIGHT);
         renderer = new GameRenderer(canvas.getGraphicsContext2D(), game, config);
+        audio = new AudioManager(game.getEvents(), game.getState());
 
         Scene scene = new Scene(new StackPane(canvas), WIDTH, HEIGHT, Color.BLACK);
-        scene.setOnKeyPressed(e -> handleKey(e.getCode()));
-        canvas.setOnMouseClicked(e -> {
-            if (renderer.isOnLeftDoorButton(e.getX(), e.getY())) {
-                game.toggleLeftDoor();
-            }
-        });
+        scene.setOnKeyPressed(this::handleKey);
+        canvas.setOnMouseClicked(e -> handleClick(e.getX(), e.getY()));
 
         stage.setTitle("Minuit au Cirque Malvaux");
         stage.setScene(scene);
@@ -108,7 +107,41 @@ public class GameApp extends Application {
         }
     }
 
-    private void handleKey(KeyCode code) {
+    private void handleClick(double x, double y) {
+        if (renderer.isOnTabletBar(x, y)) {
+            game.toggleTablet();
+        } else if (renderer.isOnLeftDoorButton(x, y)) {
+            game.toggleLeftDoor();
+        } else {
+            renderer.cameraAt(x, y).ifPresent(room -> game.selectCamera(room.getCameraNumber()));
+        }
+    }
+
+    /**
+     * Numéro de caméra correspondant à une touche, quel que soit le clavier :
+     * rangée de chiffres, pavé numérique, ou caractère tapé (AZERTY avec Maj).
+     */
+    private static int cameraNumber(KeyEvent event) {
+        String name = event.getCode().name();
+        if (name.startsWith("DIGIT") || name.startsWith("NUMPAD")) {
+            String digit = name.substring(name.length() - 1);
+            if (Character.isDigit(digit.charAt(0))) {
+                return Integer.parseInt(digit);
+            }
+        }
+        String text = event.getText();
+        if (text != null && text.length() == 1 && Character.isDigit(text.charAt(0))) {
+            return Character.getNumericValue(text.charAt(0));
+        }
+        return -1;
+    }
+
+    private void handleKey(KeyEvent event) {
+        KeyCode code = event.getCode();
+        if (code == KeyCode.M) {
+            audio.toggleMute();
+            return;
+        }
         switch (game.getState()) {
             case MENU -> {
                 int night = game.getCurrentNight();
@@ -118,7 +151,12 @@ public class GameApp extends Application {
                 else if (code == KeyCode.ESCAPE) Platform.exit();
             }
             case PLAYING -> {
+                int camera = cameraNumber(event);
                 if (code == KeyCode.Q) game.toggleLeftDoor();
+                else if (code == KeyCode.SPACE) game.toggleTablet();
+                else if (code == KeyCode.LEFT) game.cycleCamera(-1);
+                else if (code == KeyCode.RIGHT) game.cycleCamera(1);
+                else if (camera > 0) game.selectCamera(camera);
                 else if (code == KeyCode.F2) timeScale = timeScale > 1 ? 1.0 : FAST_TIME_SCALE;
                 else if (code == KeyCode.ESCAPE) game.returnToMenu();
             }
