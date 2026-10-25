@@ -12,8 +12,12 @@ import java.util.function.Consumer;
  * Boucle logique d'une nuit : fait avancer l'horloge, l'énergie et les éléments
  * enregistrés, et gère les changements d'état (victoire, jumpscare, défaite).
  *
- * <p>Ordre d'un tick : horloge, énergie (panne = défaite), 06:00 (victoire),
- * puis clowns. Une victoire à 06:00 passe donc avant une attaque du même tick.</p>
+ * <p>Ordre d'un tick : horloge, énergie, 06:00 (victoire), puis les éléments
+ * enregistrés. Une victoire à 06:00 passe donc avant une attaque du même tick.</p>
+ *
+ * <p>À la coupure de courant, la régie s'éteint (portes ouvertes, tablette
+ * baissée) et la nuit continue : les clowns s'arrêtent et seuls les éléments
+ * de panne (Henry) sont mis à jour, jusqu'à 06:00 ou l'attaque.</p>
  */
 public final class GameLoop {
 
@@ -25,6 +29,7 @@ public final class GameLoop {
     private final Office office;
     private final GameContext context;
     private final List<Updatable> systems = new ArrayList<>();
+    private final List<Updatable> blackoutSystems = new ArrayList<>();
 
     private GameState state = GameState.MENU;
     private final List<Consumer<GameState>> stateListeners = new ArrayList<>();
@@ -70,7 +75,10 @@ public final class GameLoop {
         this.office = office;
         this.context = new GameContext(clock, power, office, map, this::triggerJumpscare, eventPublisher);
         power.addConsumer(office);
-        power.onPowerOut(p -> setState(GameState.GAME_OVER));
+        power.onPowerOut(p -> {
+            office.cutPower();
+            eventPublisher.accept(new GameEvent.PowerOut());
+        });
     }
 
     /**
@@ -82,12 +90,24 @@ public final class GameLoop {
         systems.add(system);
     }
 
+    /**
+     * Ajoute un élément mis à jour seulement pendant une coupure de courant.
+     *
+     * @param system élément actif dans le noir (Henry)
+     */
+    public void registerBlackoutSystem(Updatable system) {
+        blackoutSystems.add(system);
+    }
+
     /** Remet tout à zéro et lance une nuit. */
     public void startNight() {
         clock.reset();
         power.reset();
         office.reset();
         for (Updatable s : systems) {
+            s.reset();
+        }
+        for (Updatable s : blackoutSystems) {
             s.reset();
         }
         jumpscareTimer = 0;
@@ -141,7 +161,7 @@ public final class GameLoop {
             return;
         }
 
-        for (Updatable s : systems) {
+        for (Updatable s : power.isPowerOut() ? blackoutSystems : systems) {
             s.update(deltaSeconds, context);
             if (state != GameState.PLAYING) {
                 return;
@@ -179,9 +199,9 @@ public final class GameLoop {
     public GameContext getContext() { return context; }
 
     /**
-     * Renvoie le nom du clown qui a attaqué, ou {@code null} (panne ou nuit en cours).
+     * Renvoie le nom du clown qui a attaqué, ou {@code null} (nuit en cours).
      *
-     * @return nom du clown qui a attaqué, ou {@code null} (panne ou nuit en cours)
+     * @return nom du clown qui a attaqué, ou {@code null} (nuit en cours)
      */
     public String getAttackerName() { return attackerName; }
 

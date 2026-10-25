@@ -1,5 +1,7 @@
 package com.epitech.fnah.core;
 
+import com.epitech.fnah.model.MapGraph;
+import com.epitech.fnah.model.Office;
 import com.epitech.fnah.model.PowerSystem;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -90,11 +92,90 @@ class GameLoopTest {
     }
 
     @Test
-    void powerOutEndsTheGame() {
+    void powerOutStartsBlackoutInsteadOfEndingTheNight() {
+        List<GameEvent> events = new ArrayList<>();
+        GameLoop dark = new GameLoop(clock, power, new Office(), MapGraph.circus(), events::add);
+        dark.startNight();
+        power.setEnergyMultiplier(100);
+        dark.tick(11.0);
+        assertTrue(power.isPowerOut());
+        assertEquals(GameState.PLAYING, dark.getState());
+        assertTrue(events.contains(new GameEvent.PowerOut()));
+    }
+
+    @Test
+    void blackoutStillWinsAtSix() {
         loop.startNight();
-        loop.tick(10_000.0);
+        power.setEnergyMultiplier(100);
+        loop.tick(11.0);
+        loop.tick(360.0);
+        assertEquals(GameState.WIN, loop.getState());
+    }
+
+    @Test
+    void powerOutOpensDoorsAndLowersTablet() {
+        Office office = new Office();
+        GameLoop dark = new GameLoop(clock, power, office, MapGraph.circus());
+        dark.startNight();
+        office.getLeftDoor().toggle();
+        office.getRightDoor().toggle();
+        office.getRightDoor().setBlocked(true);
+        office.getLeftLight().setOn(true);
+        office.getCameras().toggleTablet();
+        power.setEnergyMultiplier(100);
+        dark.tick(5.0);
+        assertTrue(power.isPowerOut());
+        assertFalse(office.getLeftDoor().isClosed());
+        assertFalse(office.getRightDoor().isClosed());
+        assertFalse(office.getRightDoor().isBlocked());
+        assertFalse(office.getLeftLight().isOn());
+        assertFalse(office.getCameras().isOpen());
+    }
+
+    @Test
+    void onlyBlackoutSystemsRunInTheDark() {
+        AtomicInteger normal = new AtomicInteger();
+        AtomicInteger dark = new AtomicInteger();
+        loop.registerSystem((dt, ctx) -> normal.incrementAndGet());
+        loop.registerBlackoutSystem((dt, ctx) -> dark.incrementAndGet());
+        loop.startNight();
+        loop.tick(1.0);
+        assertEquals(1, normal.get());
+        assertEquals(0, dark.get());
+        power.setEnergyMultiplier(1000);
+        loop.tick(1.0);
+        loop.tick(1.0);
+        assertEquals(1, normal.get());
+        assertEquals(2, dark.get());
+    }
+
+    @Test
+    void blackoutSystemsAreResetWithTheNight() {
+        AtomicInteger resets = new AtomicInteger();
+        loop.registerBlackoutSystem(new Updatable() {
+            @Override
+            public void update(double deltaSeconds, GameContext ctx) {
+            }
+
+            @Override
+            public void reset() {
+                resets.incrementAndGet();
+            }
+        });
+        loop.startNight();
+        loop.startNight();
+        assertEquals(2, resets.get());
+    }
+
+    @Test
+    void blackoutAttackStillLeadsToGameOver() {
+        loop.registerBlackoutSystem((dt, ctx) -> ctx.attackPlayer("Henry"));
+        loop.startNight();
+        power.setEnergyMultiplier(1000);
+        loop.tick(1.0);
         loop.tick(0.1);
-        assertEquals(GameState.GAME_OVER, loop.getState());
+        assertEquals(GameState.JUMPSCARE, loop.getState());
+        assertEquals("Henry", loop.getAttackerName());
     }
 
     @Test
