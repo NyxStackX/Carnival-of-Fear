@@ -2,6 +2,7 @@ package com.epitech.fnah.view;
 
 import com.epitech.fnah.core.Game;
 import com.epitech.fnah.core.GameState;
+import com.epitech.fnah.entity.Henry;
 import com.epitech.fnah.model.Room;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.input.KeyCode;
@@ -15,8 +16,11 @@ import javafx.scene.text.TextAlignment;
  */
 final class EndScreen implements Screen {
 
+    private static final double HENRY_ENTRY_DURATION = 4.2;
+
     private final Game game;
     private final Assets assets;
+    private final SoundManager sound;
     private final boolean victory;
     private final OptionList options;
     private javafx.scene.image.Image background;
@@ -26,6 +30,7 @@ final class EndScreen implements Screen {
     EndScreen(Game game, Assets assets, SoundManager sound, boolean victory) {
         this.game = game;
         this.assets = assets;
+        this.sound = sound;
         this.victory = victory;
         this.options = new OptionList(Draw.W / 2 - 150, 520, 50, 340, sound::menuMove, sound::menuSelect);
     }
@@ -54,6 +59,11 @@ final class EndScreen implements Screen {
 
     @Override
     public void render(GraphicsContext gc) {
+        if (isHenryIntroPlaying()) {
+            Draw.clear(gc, Color.BLACK);
+            Draw.grain(gc, 360, 0.12);
+            return;
+        }
         Draw.clear(gc, Color.BLACK);
         double fadeIn = Math.min(1.0, time / 1.2);
         gc.setGlobalAlpha(fadeIn);
@@ -80,7 +90,12 @@ final class EndScreen implements Screen {
         } else {
             gc.save();
             gc.setGlobalAlpha(0.35 * fadeIn);
-            Draw.spriteAt(gc, assets.sprite("bobo", "idle_3", 560), 1060, Draw.H + 20);
+            if (game.getPower().isPowerOut()) {
+                String frame = new String[]{"idle_1", "idle_2", "idle_3"}[(int) (time * 1.4) % 3];
+                Draw.spriteAt(gc, assets.sprite(Henry.SPRITE_ID, frame, 560), 1060, Draw.H + 20);
+            } else {
+                Draw.spriteAt(gc, assets.sprite("bobo", "idle_3", 560), 1060, Draw.H + 20);
+            }
             gc.restore();
             Draw.shadowText(gc, "NUIT PERDUE", cx, 230, assets.title(96), Draw.RED, TextAlignment.CENTER);
             String attacker = game.getAttackerName();
@@ -99,7 +114,7 @@ final class EndScreen implements Screen {
 
     @Override
     public void onKey(KeyEvent event) {
-        if (time < 0.6) {
+        if (time < (isHenryIntroPlaying() ? HENRY_ENTRY_DURATION : 0.6)) {
             return;
         }
         if (event.getCode() == KeyCode.ESCAPE) {
@@ -111,7 +126,7 @@ final class EndScreen implements Screen {
 
     @Override
     public void onClick(double x, double y) {
-        if (time >= 0.6) {
+        if (time >= (isHenryIntroPlaying() ? HENRY_ENTRY_DURATION : 0.6)) {
             options.onClick(x, y);
         }
     }
@@ -126,5 +141,9 @@ final class EndScreen implements Screen {
             game.selectNight(game.getCurrentNight() + 1);
         }
         game.returnToMenu();
+    }
+
+    private boolean isHenryIntroPlaying() {
+        return game.getPower().isPowerOut() && sound.isHenryEntryAvailable() && time < HENRY_ENTRY_DURATION;
     }
 }

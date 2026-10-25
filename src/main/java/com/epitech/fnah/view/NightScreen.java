@@ -2,6 +2,8 @@ package com.epitech.fnah.view;
 
 import com.epitech.fnah.core.Game;
 import com.epitech.fnah.core.GameEvent;
+import com.epitech.fnah.entity.Mimi;
+import com.epitech.fnah.entity.ZigEtZag;
 import com.epitech.fnah.model.CameraSystem;
 import com.epitech.fnah.model.Room;
 import javafx.scene.canvas.GraphicsContext;
@@ -31,8 +33,11 @@ final class NightScreen implements Screen {
 
     // Porte gauche
     private static final double DOOR_X = 80, DOOR_Y = 110, DOOR_W = 270, DOOR_H = 480;
+    // Porte droite
+    private static final double RIGHT_DOOR_X = 930, RIGHT_DOOR_Y = 110, RIGHT_DOOR_W = 270, RIGHT_DOOR_H = 480;
     // Bouton de la porte
     private static final double BTN_X = 372, BTN_Y = 300, BTN_W = 96, BTN_H = 140;
+    private static final double RIGHT_BTN_X = 812, RIGHT_BTN_Y = 300, RIGHT_BTN_W = 96, RIGHT_BTN_H = 140;
     // Barre « Caméras »
     private static final double BAR_X = 440, BAR_Y = 682, BAR_W = 400, BAR_H = 30;
     // Plan des caméras
@@ -149,6 +154,8 @@ final class NightScreen implements Screen {
         int camera = cameraNumber(event);
         if (code == KeyCode.Q) {
             game.toggleLeftDoor();
+        } else if (code == KeyCode.E) {
+            game.toggleRightDoor();
         } else if (code == KeyCode.SPACE) {
             game.toggleTablet();
         } else if (code == KeyCode.LEFT) {
@@ -172,6 +179,8 @@ final class NightScreen implements Screen {
             game.toggleTablet();
         } else if (!open && Draw.inside(x, y, BTN_X, BTN_Y, BTN_W, BTN_H)) {
             game.toggleLeftDoor();
+        } else if (!open && Draw.inside(x, y, RIGHT_BTN_X, RIGHT_BTN_Y, RIGHT_BTN_W, RIGHT_BTN_H)) {
+            game.toggleRightDoor();
         } else if (open) {
             cameraAt(x, y).ifPresent(room -> game.selectCamera(room.getCameraNumber()));
         }
@@ -183,6 +192,14 @@ final class NightScreen implements Screen {
         CameraSystem cameras = game.getOffice().getCameras();
         if (cameras.isWatching(event.from()) || cameras.isWatching(event.to())) {
             staticTimer = MOVE_STATIC;
+        }
+        if (Mimi.NAME.equals(event.name())) {
+            showSubtitle("* Des craquements d'os résonnent dans le couloir droit *");
+            return;
+        }
+        if (ZigEtZag.NAME.equals(event.name())) {
+            showSubtitle("* Des rires d'enfants résonnent dans le chapiteau *");
+            return;
         }
         if (event.to() == Room.REGIE) {
             return;
@@ -212,6 +229,8 @@ final class NightScreen implements Screen {
         gc.drawImage(officeBackground, 0, 0);
         drawDoor(gc);
         drawDoorButton(gc);
+        drawRightDoor(gc);
+        drawRightDoorButton(gc);
         Draw.grain(gc, 575, 444, 180, 100, 90, 0.35);
 
         Draw.grain(gc, 250, 0.10);
@@ -335,6 +354,61 @@ final class NightScreen implements Screen {
         Draw.text(gc, "[Q]", cx, BTN_Y + 118, assets.ui(13), Draw.TEXT_DIM, TextAlignment.CENTER);
     }
 
+    private void drawRightDoor(GraphicsContext gc) {
+        boolean closed = game.getOffice().getRightDoor().isClosed();
+        Image corridor = assets.camera(Room.COULOIR_DROIT);
+        if (corridor != null) {
+            double sw = corridor.getWidth() * 0.28;
+            double sh = sw * RIGHT_DOOR_H / RIGHT_DOOR_W;
+            gc.drawImage(corridor, (corridor.getWidth() - sw) / 2, (corridor.getHeight() - sh) / 2, sw, sh,
+                    RIGHT_DOOR_X, RIGHT_DOOR_Y, RIGHT_DOOR_W, RIGHT_DOOR_H);
+        }
+        gc.setFill(Color.rgb(0, 0, 0, 0.62));
+        gc.fillRect(RIGHT_DOOR_X, RIGHT_DOOR_Y, RIGHT_DOOR_W, RIGHT_DOOR_H);
+        if (closed) {
+            gc.setFill(Color.web("#393436"));
+            gc.fillRect(RIGHT_DOOR_X, RIGHT_DOOR_Y, RIGHT_DOOR_W, RIGHT_DOOR_H);
+            gc.setStroke(Color.rgb(0, 0, 0, 0.45));
+            gc.setLineWidth(4);
+            for (double y = RIGHT_DOOR_Y + 24; y < RIGHT_DOOR_Y + RIGHT_DOOR_H - 40; y += 30) {
+                gc.strokeLine(RIGHT_DOOR_X, y, RIGHT_DOOR_X + RIGHT_DOOR_W, y);
+            }
+        } else if (game.getMimi().getRoom() == Room.COULOIR_DROIT) {
+            double breathe = Math.sin(time * 2.2) * 4;
+            Draw.spriteAt(gc, assets.sprite("mimi", "idle_2", 420),
+                    RIGHT_DOOR_X + RIGHT_DOOR_W / 2, RIGHT_DOOR_Y + RIGHT_DOOR_H + 10 + breathe);
+            if (game.getMimi().isAtEmbrasure()) {
+                Draw.text(gc, "PORTE BLOQUÉE", RIGHT_DOOR_X + RIGHT_DOOR_W / 2,
+                        RIGHT_DOOR_Y + 30, assets.ui(18), Color.web("#ff5260"), TextAlignment.CENTER);
+            }
+        }
+        gc.setStroke(Color.web("#2e2326"));
+        gc.setLineWidth(18);
+        gc.strokeRect(RIGHT_DOOR_X, RIGHT_DOOR_Y, RIGHT_DOOR_W, RIGHT_DOOR_H);
+        gc.setStroke(Color.web("#4a3a2c"));
+        gc.setLineWidth(3);
+        gc.strokeRect(RIGHT_DOOR_X - 9, RIGHT_DOOR_Y - 9, RIGHT_DOOR_W + 18, RIGHT_DOOR_H + 18);
+    }
+
+    private void drawRightDoorButton(GraphicsContext gc) {
+        boolean closed = game.getOffice().getRightDoor().isClosed();
+        boolean blocked = game.getOffice().getRightDoor().isBlocked();
+        gc.setFill(Color.web("#2a2426"));
+        gc.fillRect(RIGHT_BTN_X, RIGHT_BTN_Y, RIGHT_BTN_W, RIGHT_BTN_H);
+        gc.setStroke(blocked ? Color.web("#e0303f") : Color.web("#4a3f3a"));
+        gc.setLineWidth(2);
+        gc.strokeRect(RIGHT_BTN_X + 4, RIGHT_BTN_Y + 4, RIGHT_BTN_W - 8, RIGHT_BTN_H - 8);
+        double cx = RIGHT_BTN_X + RIGHT_BTN_W / 2;
+        gc.setFill(closed ? Color.web("#e0303f") : Color.web("#4a1a1f"));
+        gc.fillOval(cx - 28, RIGHT_BTN_Y + 18, 56, 56);
+        gc.setStroke(Color.web("#120808"));
+        gc.setLineWidth(3);
+        gc.strokeOval(cx - 28, RIGHT_BTN_Y + 18, 56, 56);
+        Draw.text(gc, blocked ? "BLOQUÉE" : "PORTE", cx, RIGHT_BTN_Y + 96,
+                assets.ui(15), blocked ? Color.web("#ff5260") : Draw.TEXT, TextAlignment.CENTER);
+        Draw.text(gc, "[E]", cx, RIGHT_BTN_Y + 118, assets.ui(13), Draw.TEXT_DIM, TextAlignment.CENTER);
+    }
+
     private void drawPoster(GraphicsContext gc) {
         gc.save();
         gc.translate(1010, 260);
@@ -411,11 +485,23 @@ final class NightScreen implements Screen {
             String frame = new String[]{"idle_1", "idle_2", "idle_3"}[(int) (time * 0.8) % 3];
             Draw.spriteAt(gc, assets.sprite("pepin", frame, PEPIN_ON_CAMERA[2]), PEPIN_ON_CAMERA[0], PEPIN_ON_CAMERA[1]);
         }
+        drawCharacterOnCamera(gc, room, game.getMimi().getRoom(), "mimi", 420);
+        drawCharacterOnCamera(gc, room, game.getZigEtZag().getRoom(), ZigEtZag.SPRITE_ID, 390);
 
         Draw.overlay(gc, 0.3, 0.25, 0.85);
-        boolean noisy = staticTimer > 0;
+        boolean disabled = cameras.isDisabled(room);
+        boolean noisy = staticTimer > 0 || disabled;
         Draw.grain(gc, noisy ? 2200 : 220, noisy ? 0.6 : 0.12);
-        if (noisy) {
+        if (disabled) {
+            gc.setFill(Color.rgb(190, 190, 190, 0.78));
+            gc.fillRect(0, 0, W, H);
+            if (cameras.getDisabledTimeRemaining(room) > ZigEtZag.CAMERA_DISABLE_DURATION - 1.5) {
+                gc.setGlobalAlpha(0.9);
+                Draw.spriteAt(gc, assets.sprite(ZigEtZag.SPRITE_ID, "scare_1", 490), W / 2, 620);
+                gc.setGlobalAlpha(1.0);
+            }
+            Draw.text(gc, "SIGNAL PERDU", W / 2, H / 2, assets.title(48), Color.WHITE, TextAlignment.CENTER);
+        } else if (noisy) {
             gc.setFill(Color.rgb(160, 160, 160, 0.25 * Math.min(1.0, staticTimer / SWITCH_STATIC)));
             gc.fillRect(0, 0, W, H);
         }
@@ -430,6 +516,20 @@ final class NightScreen implements Screen {
         Draw.text(gc, "[1-8] ou [Gauche / Droite] Changer de caméra", W / 2, 22, assets.ui(15),
                 Draw.TEXT_DIM, TextAlignment.CENTER);
         drawCameraMap(gc, cameras);
+    }
+
+    private void drawCharacterOnCamera(GraphicsContext gc, Room camera, Room characterRoom,
+                                       String spriteId, double height) {
+        if (characterRoom != camera) {
+            return;
+        }
+        double[] position = switch (camera) {
+            case LOGES, MENAGERIE -> new double[]{690, 650};
+            case COULOIR_DROIT -> new double[]{620, 610};
+            default -> new double[]{W / 2, 650};
+        };
+        String frame = new String[]{"idle_1", "idle_2", "idle_1", "idle_3"}[(int) (time * 1.3) % 4];
+        Draw.spriteAt(gc, assets.sprite(spriteId, frame, height), position[0], position[1]);
     }
 
     private void drawCameraMap(GraphicsContext gc, CameraSystem cameras) {
@@ -524,6 +624,11 @@ final class NightScreen implements Screen {
             gc.fillRect(W / 2 - 330, 606, 660, 36);
             Draw.text(gc, subtitle, W / 2, 624, assets.ui(19), Draw.CREAM, TextAlignment.CENTER);
             gc.setGlobalAlpha(1.0);
+        }
+        if (game.getMimi().isAtEmbrasure()) {
+            int seconds = (int) Math.ceil(game.getMimi().getEmbrasureTimeRemaining());
+            Draw.text(gc, "MIMI BLOQUE LA PORTE — REGARDEZ CAM 7 (" + seconds + " s)",
+                    W / 2, 570, assets.ui(18), Color.web("#ff5260"), TextAlignment.CENTER);
         }
     }
 

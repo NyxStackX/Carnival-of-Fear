@@ -3,6 +3,8 @@ package com.epitech.fnah.view;
 import com.epitech.fnah.core.Game;
 import com.epitech.fnah.core.GameEvent;
 import com.epitech.fnah.core.GameState;
+import com.epitech.fnah.entity.Mimi;
+import com.epitech.fnah.entity.ZigEtZag;
 import com.epitech.fnah.model.Room;
 import javafx.scene.media.AudioClip;
 import javafx.scene.media.Media;
@@ -35,7 +37,7 @@ public final class SoundManager {
 
     private static final String[] EFFECTS = {"door_close", "door_open", "tablet_up", "tablet_down",
         "camera_switch", "static_loop", "klaxon", "footsteps", "scream", "chime_six", "hour_bell",
-        "menu_move", "menu_select", "jack_pop"};
+        "menu_move", "menu_select", "jack_pop", "henry_entry"};
     private static final double LEFT = -0.7;
 
     private final Game game;
@@ -76,10 +78,12 @@ public final class SoundManager {
 
         var events = game.getEvents();
         events.subscribe(GameEvent.StateChanged.class, e -> onState(e.state()));
-        events.subscribe(GameEvent.DoorToggled.class, e -> play(e.closed() ? "door_close" : "door_open", 0.9, LEFT));
+        events.subscribe(GameEvent.DoorToggled.class, e -> play(e.closed() ? "door_close" : "door_open", 0.9,
+                e.side() == com.epitech.fnah.model.Door.Side.LEFT ? LEFT : -LEFT));
         events.subscribe(GameEvent.TabletToggled.class, e -> onTablet(e.open()));
         events.subscribe(GameEvent.CameraSelected.class, e -> play("camera_switch", 0.5, 0));
         events.subscribe(GameEvent.AnimatronicMoved.class, this::onAnimatronicMoved);
+        events.subscribe(GameEvent.FakeHornPlayed.class, e -> play("klaxon", 0.65, LEFT));
         events.subscribe(GameEvent.HourChanged.class, e -> {
             if (e.hour() < 6) {
                 play("hour_bell", 0.45, 0);
@@ -114,6 +118,7 @@ public final class SoundManager {
         }
         if (muted) {
             stopClip("static_loop");
+            stopClip("henry_entry");
         } else if (game.getState() == GameState.PLAYING && game.getOffice().getCameras().isOpen()) {
             startHiss();
         }
@@ -135,6 +140,10 @@ public final class SoundManager {
      */
     public boolean isMuted() {
         return muted;
+    }
+
+    boolean isHenryEntryAvailable() {
+        return available && !muted;
     }
 
     private void onState(GameState state) {
@@ -162,6 +171,9 @@ public final class SoundManager {
             case GAME_OVER -> {
                 stop(nightMusic);
                 stopClip("static_loop");
+                if (game.getPower().isPowerOut()) {
+                    play("henry_entry", 0.7, 0);
+                }
             }
         }
     }
@@ -177,6 +189,13 @@ public final class SoundManager {
     }
 
     private void onAnimatronicMoved(GameEvent.AnimatronicMoved event) {
+        if (Mimi.NAME.equals(event.name())) {
+            play("footsteps", 0.55, -LEFT);
+            return;
+        }
+        if (ZigEtZag.NAME.equals(event.name())) {
+            return;
+        }
         if (event.to() == Room.REGIE) {
             return;
         }

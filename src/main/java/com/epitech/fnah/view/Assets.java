@@ -46,7 +46,10 @@ public final class Assets {
         }
         Map<String, String[]> frames = Map.of(
                 "bobo", new String[]{"idle_1", "idle_2", "idle_3", "door", "scare_1", "scare_2"},
-                "pepin", new String[]{"idle_1", "idle_2", "idle_3", "grin", "scare_1", "scare_2"});
+                "pepin", new String[]{"idle_1", "idle_2", "idle_3", "grin", "scare_1", "scare_2"},
+                "mimi", new String[]{"idle_1", "idle_2", "idle_3", "scare_1", "scare_2", "scare_3"},
+                "henry", new String[]{"idle_1", "idle_2", "idle_3", "scare_1", "scare_2", "scare_3"},
+                "zig_et_zag", new String[]{"idle_1", "idle_2", "idle_3", "scare_1", "scare_2", "scare_3"});
         for (Map.Entry<String, String[]> entry : frames.entrySet()) {
             String character = entry.getKey();
             for (String frame : entry.getValue()) {
